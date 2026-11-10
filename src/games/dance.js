@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { sceneToon, inkGroup } from '../toon.js';
 import { Rig, PLAYER_CSS, PLAYER_NAMES } from '../tracking.js';
 import { buildSkeleton } from '../sim.js';
-import { Avatar } from '../avatar.js';
+import { Avatar, COACH } from '../avatar.js';
 
 const D = Math.PI / 180, RISE = 1.9;
 const clamp = THREE.MathUtils.clamp, lerp = THREE.MathUtils.lerp;
@@ -156,7 +156,7 @@ const intentFor = (pose, extra = {}) => ({ arms: pose.a, crouch: pose.c, lean: p
 class Coach {
   constructor(app, accent) {
     this.app = app; this.rig = new Rig(); this.holder = new THREE.Group(); this.holder.position.z = -4.5; app.root.add(this.holder);
-    this.avatar = new Avatar(accent, 4); this.holder.add(this.avatar.group); this.h = 4.8; this.x = 0; this.P = null;
+    this.avatar = new Avatar({ ...COACH, accent, shoe: accent }); this.holder.add(this.avatar.group); this.h = 4.8; this.x = 0; this.P = null;
     const riser = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 3.1, RISE, 40), sceneToon(0x3a1c6e, { emissive: accent, emissiveIntensity: 0.25 }));
     this.riser = riser; this.holder.add(riser); inkGroup(riser);
     this.rim = new THREE.Mesh(new THREE.TorusGeometry(2.62, 0.07, 8, 60), new THREE.MeshBasicMaterial({ color: accent })); this.rim.rotation.x = Math.PI / 2; this.holder.add(this.rim);

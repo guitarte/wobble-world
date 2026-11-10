@@ -7,7 +7,7 @@ export const MARKUP = `
   <div id="top"><div id="tleft"><div id="gtitle"></div><div id="status"></div></div><div id="timer"></div><div id="scores"></div></div>
   <div id="strip"></div>
   <div id="buttons"></div>
-  <div id="menu-title"><span class="logo small">Wobble World</span><em>Hold a hand on a game to play!</em></div>
+  <div id="menu-title"><span class="logo small">Wobble World</span><em id="menu-note">Hold a hand on a game to play!</em></div>
   <div id="tags"></div>
   <div id="cursors"></div>
   <div id="popups"></div>

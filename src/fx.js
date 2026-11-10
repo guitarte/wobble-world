@@ -146,6 +146,7 @@ export class FX {
     let s = this.swooshes.get(id); if (!s) { s = new Swoosh(this.scene, color); this.swooshes.set(id, s); }
     s.seen = this.clock; s.push(p.x, p.y, speed, S, dt);
   }
+  dropSwoosh(id) { const s = this.swooshes.get(id); if (s) { s.mesh.removeFromParent(); s.mesh.geometry.dispose(); this.swooshes.delete(id); } }
   confetti(p, count = 60, colors = [0xff4d6d, 0x19c9c0, 0xffc21a, 0x9a5bff, 0xffffff], spread = 7) {
     for (let k = 0; k < count; k++) {
       if (this.cData.length >= MAXC) this.cData.shift();

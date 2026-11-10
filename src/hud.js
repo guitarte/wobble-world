@@ -15,6 +15,12 @@ export const ICONS = {
   kpop: `<svg viewBox="0 0 120 120"><path d="M60 102S16 74 16 44a22 22 0 0 1 44-6 22 22 0 0 1 44 6c0 30-44 58-44 58z" fill="#fff"/></svg>`,
   hiphop: `<svg viewBox="0 0 120 120"><rect x="14" y="38" width="92" height="56" rx="12" fill="#fff"/><circle cx="40" cy="66" r="15" fill="#2a1a3a"/><circle cx="80" cy="66" r="15" fill="#2a1a3a"/><circle cx="40" cy="66" r="5" fill="#fff"/><circle cx="80" cy="66" r="5" fill="#fff"/><path d="M34 38V24h52v14" stroke="#fff" stroke-width="8" fill="none"/></svg>`,
   again: `<svg viewBox="0 0 120 120"><path d="M60 24a36 36 0 1 0 34 24" stroke="#fff" stroke-width="12" fill="none" stroke-linecap="round"/><path d="M58 6l26 18-26 18z" fill="#fff"/></svg>`,
+  hero: `<svg viewBox="0 0 120 120"><path d="M22 58L14 22l22 14L48 8l12 22L72 8l12 28 22-14-8 36z" fill="#ffd84a"/><circle cx="60" cy="72" r="36" fill="#fff"/><ellipse cx="46" cy="70" rx="7" ry="10" fill="#2a1a3a"/><ellipse cx="74" cy="70" rx="7" ry="10" fill="#2a1a3a"/><path d="M46 90q14 12 28 0" stroke="#2a1a3a" stroke-width="6" fill="none" stroke-linecap="round"/></svg>`,
+  more: `<svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="46" fill="#fff"/><path d="M48 34l30 26-30 26z" fill="#2a1a3a"/></svg>`,
+  back: `<svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="46" fill="#fff"/><path d="M72 34L42 60l30 26z" fill="#2a1a3a"/></svg>`,
+  ok: `<svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="46" fill="#fff"/><path d="M36 62l16 16 32-36" stroke="#12a877" stroke-width="13" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  make: `<svg viewBox="0 0 120 120"><path d="M26 94l8-30 44-44 22 22-44 44z" fill="#fff"/><path d="M26 94l8-30 22 22z" fill="#ffd84a"/><path d="M92 62l4 11 11 4-11 4-4 11-4-11-11-4 11-4zM24 14l3 9 9 3-9 3-3 9-3-9-9-3 9-3z" fill="#ffd84a"/></svg>`,
+  mirror: `<svg viewBox="0 0 120 120"><rect x="12" y="30" width="96" height="66" rx="12" fill="#fff"/><path d="M40 30l8-14h24l8 14z" fill="#fff"/><circle cx="60" cy="63" r="22" fill="#2a1a3a"/><circle cx="60" cy="63" r="12" fill="#4fd8ff"/><circle cx="54" cy="57" r="4" fill="#fff"/></svg>`,
   home: `<svg viewBox="0 0 120 120"><path d="M16 60l44-40 44 40" stroke="#fff" stroke-width="12" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M30 58v42h24V76h12v24h24V58" fill="#fff"/></svg>`,
 };
 
@@ -74,19 +80,33 @@ export class HUD {
       b.style.cssText += `left:calc(50% + ${d.x - d.w / 2} * var(--u));top:calc(50% - ${d.y + d.h / 2} * var(--u));width:calc(${d.w} * var(--u));height:calc(${d.h} * var(--u));`;
       if (d.colors) { b.style.setProperty('--c1', d.colors[0]); b.style.setProperty('--c2', d.colors[1]); }
       const rec = { ...d, el: b, p: 0, hot: false, fired: false, dwell: d.dwell ?? 1.25 };
-      b.addEventListener('click', () => this.fire(rec));
+      b.addEventListener('click', () => { rec.by = undefined; this.fire(rec); });
       this.btnEl.appendChild(b); this.buttons.push(rec);
     }
   }
   clearButtons() { this.btnEl.innerHTML = ''; this.buttons = []; }
-  // one choice at a time: once a button has gone off, the rest wait for the screen to change
-  fire(b) { if (this.buttons.some(x => x.fired)) return; b.fired = true; b.el.classList.add('fired'); this.app.audio.select(); b.onSelect(); }
+  // one choice at a time: once a button has gone off, the rest wait for the screen to change.
+  // A repeat button (a hero to try on, a colour to pick) can be chosen again and again.
+  fire(b) {
+    if (this.buttons.some(x => x.fired)) return;
+    const by = b.by ?? this.only ?? this.app.players[0]?.slot ?? 0;
+    this.app.audio.select();
+    if (b.repeat) { b.p = 0; b.armed = false; b.hot = false; b.el.classList.remove('hot'); b.onSelect(by); return; }
+    b.fired = true; b.el.classList.add('fired'); b.onSelect(by);
+  }
+  // a player's colour and name follow their hero
+  identity(slot) {
+    for (const h of [0, 1]) this.cursors[slot * 2 + h].style.setProperty('--pc', PLAYER_CSS[slot]);
+    this.tags[slot].textContent = PLAYER_NAMES[slot]; this.tags[slot].style.setProperty('--pc', PLAYER_CSS[slot]);
+    const c = this.chips[slot]; if (c) { c.style.setProperty('--pc', PLAYER_CSS[slot]); c.querySelector('b').textContent = PLAYER_NAMES[slot]; }
+  }
   updateButtons(players, dt) {
     let n = 0; const show = this.buttons.some(b => !b.quiet);
     // On menus a hand is a stretched pointer. The quiet home button during a game uses the
     // hand itself, so nobody leaves a game by accident with a big dance move.
     const cx = (p, h) => (show ? p.rig.cursorX(h) : p.rig.hands[h].x);
     if (this.app.sim) players = players.filter(p => p.slot === 0); // without a camera only the pointer's hero chooses
+    if (this.only != null && players.some(p => p.slot === this.only)) players = players.filter(p => p.slot === this.only); // one player is building a hero
     for (const p of players) for (let h = 0; h < 2; h++) {
       const c = this.cursors[p.slot * 2 + h];
       c.style.transform = `translate(calc(${cx(p, h)} * var(--u)), calc(${-p.rig.cursorY(h)} * var(--u)))`; c.classList.toggle('on', show); c.dataset.live = '1'; n++;
@@ -106,7 +126,7 @@ export class HUD {
       const mine = [0, 1].map(h => this.buttons.find(b => !b.fired && on(p, h, b)));
       // two hands on two different buttons is a cheer or a star jump, not a choice
       if (mine[0] && mine[1] && mine[0] !== mine[1]) continue;
-      for (const b of mine) if (b) pointed.add(b);
+      for (const b of mine) if (b) { pointed.add(b); b.by = p.slot; }
     }
     for (const b of this.buttons) {
       if (b.fired) continue;

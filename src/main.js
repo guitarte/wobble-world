@@ -16,6 +16,7 @@ import { MARKUP } from './markup.js';
 import { Tracker, Rig, PLAYER_COLORS, PLAYER_CSS, PLAYER_NAMES } from './tracking.js';
 import { SimSource, buildSkeleton } from './sim.js';
 import { Avatar } from './avatar.js';
+import { HeroBook, portrait, makeHero, choicesOf, PALETTE, CUTS, EXTRAS, NAMES, HAIR_STYLES, EMBLEMS } from './heroes.js';
 import { FX } from './fx.js';
 import { AudioEngine } from './audio.js';
 import { Environment } from './env.js';
@@ -25,7 +26,20 @@ import { ShapeUp } from './games/walls.js';
 import { CometKeeper } from './games/comet.js';
 import { DanceClass, DanceBattle, GENRES, demoPose, lessonOf, lessonsDone, lessonMoves, DEBUG as DANCE } from './games/dance.js';
 
-const GAMES = [JellyJam, ShapeUp, CometKeeper, DanceClass, DanceBattle];
+// The game library, a page of five at a time.
+const PAGES = [
+  { name: 'Games', games: [JellyJam, ShapeUp, CometKeeper, DanceClass, DanceBattle] },
+];
+const GAMES = [...new Set(PAGES.flatMap(p => p.games))];
+// The hero creator, one choice at a time.
+const STEPS = [
+  { key: 'hairStyle', title: 'Hair', opts: HAIR_STYLES }, { key: 'hair', title: 'Hair colour', opts: PALETTE.hair, color: true }, { key: 'skin', title: 'Skin', opts: PALETTE.skin, color: true },
+  { key: 'main', title: 'Outfit colour', opts: PALETTE.main, color: true }, { key: 'accent', title: 'Trim colour', opts: PALETTE.accent, color: true }, { key: 'cut', title: 'Outfit', opts: CUTS, full: true },
+  { key: 'emblem', title: 'Badge', opts: EMBLEMS }, { key: 'extra', title: 'Extras', opts: EXTRAS, full: true }, { key: 'name', title: 'Name', opts: NAMES, text: true },
+];
+const LOOKS = { spikes: 'Spikes', tails: 'Twin tails', quiff: 'Quiff', flow: 'Long', afro: 'Curls', mohawk: 'Crest', bob: 'Bob', pony: 'Ponytail', buns: 'Buns', hoodie: 'Hoodie', tee: 'T-shirt', flares: 'Flares', none: 'Nothing', scarf: 'Scarf', cape: 'Cape' };
+const cssOf = (c) => '#' + new THREE.Color(c).getHexString();
+const cap = (t) => t[0].toUpperCase() + t.slice(1);
 const CAM_D = 13;
 const SITE = 'https://guitarte.github.io/wobble-world/';
 const qs = new URLSearchParams(location.search);
@@ -48,6 +62,7 @@ class App {
     this.fx = new FX(this.scene, this.camera, $('popups'));
     this.audio = new AudioEngine();
     this.hud = new HUD(this);
+    this.heroes = new HeroBook(); this.page = 0;
     this.tracker = new Tracker(); this.sim = null;
     this.avatars = new Array(4).fill(null);
     this.scores = [0, 0, 0, 0]; this.seen = new Set();
@@ -96,7 +111,7 @@ class App {
   bootSim(n, auto = false) { if (!auto) this.audio.init(); this.sim = new SimSource(this.tracker, n); this.sim.intentFn = (i, p, b, t) => this.botIntent(i, p, b, t); this.begin(); }
   // The four heroes dance on the title screen until someone starts playing.
   startDemo() {
-    this.demo = [0, 1, 2, 3].map(i => { const a = new Avatar(PLAYER_COLORS[i], i); this.avatarRoot.add(a.group); return { a, rig: new Rig(), P: null, x: [-6.5, -4.7, 4.7, 6.5][i], h: [3.7, 4.5, 4.3, 3.5][i] }; });
+    this.demo = [0, 1, 2, 3].map(i => { const a = new Avatar(this.heroes.hero(i)); this.avatarRoot.add(a.group); return { a, rig: new Rig(), P: null, x: [-6.5, -4.7, 4.7, 6.5][i], h: [3.7, 4.5, 4.3, 3.5][i] }; });
   }
   updateDemo(dt, t) {
     this.demo.forEach((d, i) => {
@@ -139,7 +154,7 @@ class App {
 
   get players() { return this.tracker.active; }
   onJoin(p) {
-    const a = new Avatar(p.color, p.slot); this.avatars[p.slot] = a; this.avatarRoot.add(a.group); a.popIn();
+    const a = new Avatar(this.heroes.hero(p.slot)); this.avatars[p.slot] = a; this.avatarRoot.add(a.group); a.popIn();
     this.audio.join(); this.joinFx = p;
     if (this.phase === 'play' || this.phase === 'intro' || this.phase === 'count') this.hud.setScore(p.slot, this.scores[p.slot]);
   }
@@ -158,12 +173,86 @@ class App {
   exitButton() { return { x: -7.2, y: 3.75, w: 1.1, h: 1.1, dwell: 1.6, cls: 'exit', quiet: true, html: ICONS.home, onSelect: () => this.toMenu() }; }
   enterMenu() {
     this.cleanupGame(); this.phase = 'menu';
+    if (this.make) { const { slot } = this.make; this.make = null; this.heroes.wear(slot, null); this.dress(slot); } // a hero left half-made is dropped
+    this.hud.only = null;
     this.env.set('meadow'); this.audio.playMusic('menu'); this.audio.duck(false);
     $('menu-title').classList.add('on'); $('pip').classList.toggle('on', this.tracker.mode === 'camera');
-    this.hud.setButtons(GAMES.map((G, i) => {
+    this.showMenu();
+  }
+  sideButton(x, html, colors, onSelect, o = {}) { return { x, y: 0.3, w: 2.1, h: 1.5, cls: 'side mini', colors, html, onSelect, ...o }; }
+  showMenu() {
+    const pages = PAGES.filter(pg => !pg.camera || this.tracker.mode === 'camera'), pg = pages[this.page % pages.length], n = pg.games.length;
+    $('menu-note').textContent = pages.length > 1 ? `${pg.name}: hold a hand on a game to play!` : 'Hold a hand on a game to play!';
+    const cards = pg.games.map((G, i) => {
       const best = this.best(G.id);
-      return { x: (i - 2) * 3.08, y: 2.5, w: 2.84, h: 2.3, colors: G.colors, html: `${ICONS[G.icon]}<h3>${G.title}</h3><p>${G.blurb}</p>${best ? `<span class="bestv">Best ${best.toLocaleString()}</span>` : ''}`, onSelect: () => (G.dance ? this.enterGenre(G) : this.startGame(G)) };
+      return { x: (i - (n - 1) / 2) * 3.08, y: 2.5, w: 2.84, h: 2.3, colors: G.colors, html: `${ICONS[G.icon]}<h3>${G.title}</h3><p>${G.blurb}</p>${best ? `<span class="bestv">Best ${best.toLocaleString()}</span>` : ''}`, onSelect: () => (G.dance ? this.enterGenre(G) : this.startGame(G, pg.opts)) };
+    });
+    cards.push(this.sideButton(-6.85, `${ICONS.hero}<h3>Heroes</h3>`, ['#ff8a3d', '#d6306f'], () => this.enterHeroes()));
+    if (pages.length > 1) cards.push(this.sideButton(6.85, `${ICONS.more}<h3>More games</h3>`, ['#8f6bff', '#5a35d6'], () => { this.page = (this.page + 1) % pages.length; this.showMenu(); }, { repeat: true }));
+    this.hud.setButtons(cards);
+  }
+
+  // ------------------------------------------------------------ heroes
+  // Put a player slot into the hero it should be wearing now.
+  dress(slot) {
+    this.heroes.apply(slot);
+    const p = this.tracker.players[slot]; if (p) { p.color = PLAYER_COLORS[slot]; p.css = PLAYER_CSS[slot]; p.name = PLAYER_NAMES[slot]; }
+    const old = this.avatars[slot];
+    if (old) { old.dispose(); const a = new Avatar(this.heroes.hero(slot)); this.avatars[slot] = a; this.avatarRoot.add(a.group); a.popIn(); if (p) { this.fx.burst(p.j.chest, { count: 30, color: p.color, speed: 7, size: 0.3 }); this.fx.ring(p.j.chest, p.color, 2.6, 0.5); } }
+    this.fx.dropSwoosh(slot * 2); this.fx.dropSwoosh(slot * 2 + 1); this.hud.identity(slot);
+  }
+  enterHeroes() {
+    if (this.busy) return; this.busy = true;
+    this.hud.wipe('#ff8a3d', () => {
+      this.phase = 'genre'; this.hud.only = null; $('menu-title').classList.add('on'); $('menu-note').textContent = 'Hold a hand on a hero to become them';
+      this.showHeroes(); this.hud.banner('Pick your hero', '#fff', 1.8, '', 'low');
+    }).then(() => { this.busy = false; });
+  }
+  showHeroes() {
+    const all = this.heroes.roster, pages = Math.ceil(all.length / 4), pg = (this.heroPage || 0) % pages, list = all.slice(pg * 4, pg * 4 + 4);
+    const cards = list.map((h, i) => ({
+      x: (i - 2) * 3.08, y: 2.5, w: 2.84, h: 2.3, cls: 'hero', repeat: true, colors: [cssOf(h.main), cssOf(h.dark)],
+      html: `<img src="${portrait(this.renderer, h)}" alt=""><h3>${h.name}</h3>${this.players.some(p => this.heroes.picks[p.slot] === h.id) ? '<span class="bestv">In play</span>' : ''}`, onSelect: (by) => this.pickHero(by, h),
     }));
+    cards.push({ x: 2 * 3.08, y: 2.5, w: 2.84, h: 2.3, cls: 'hero', repeat: true, colors: ['#8f6bff', '#5a35d6'], html: `${ICONS.more}<h3>More heroes</h3><p>Page ${pg + 1} of ${pages}</p>`, onSelect: () => { this.heroPage = pg + 1; this.showHeroes(); } });
+    cards.push(this.sideButton(-6.85, `${ICONS.make}<h3>Make your own</h3>`, ['#ff8a3d', '#d6306f'], (by) => this.enterCreator(by)));
+    cards.push(this.sideButton(6.85, `${ICONS.ok}<h3>Done</h3>`, ['#2fe0a0', '#12a877'], () => this.toMenu()));
+    this.hud.setButtons(cards);
+  }
+  pickHero(slot, h) {
+    const other = this.heroes.takenBy(h.id);
+    if (other >= 0 && other !== slot) {
+      if (this.tracker.players[other]) { this.audio.bad(); this.hud.banner(`${PLAYER_NAMES[other]} is in play`, '#ffd23f', 1.2, 'Pick another hero', 'low'); return; }
+      this.heroes.choose(other, this.heroes.picks[slot]); // nobody is using it: trade places
+    }
+    this.heroes.choose(slot, h.id); this.dress(slot); this.audio.gold(); this.showHeroes();
+  }
+  enterCreator(slot) {
+    if (this.busy) return; this.busy = true;
+    const cur = this.heroes.hero(slot), c = choicesOf(cur);
+    if (cur.custom) c.id = cur.id; else { delete c.id; c.name = NAMES[Math.floor(Math.random() * NAMES.length)]; }
+    this.make = { slot, c, step: 0, page: 0 };
+    this.hud.wipe('#ff8a3d', () => { this.hud.only = slot; this.wearDraft(); this.showCreator(); this.hud.banner('Make your hero', '#fff', 1.6, 'Hold a hand on a card to try it on', 'low'); }).then(() => { this.busy = false; });
+  }
+  wearDraft() { const m = this.make; this.heroes.wear(m.slot, makeHero({ ...m.c, id: m.c.id || 'draft' })); this.dress(m.slot); }
+  showCreator() {
+    const m = this.make, st = STEPS[m.step], per = st.opts.length > 5 ? 4 : 5, pages = Math.ceil(st.opts.length / per), pg = m.page % pages, list = st.opts.slice(pg * per, pg * per + per);
+    const n = list.length + (pages > 1 ? 1 : 0), xs = (i) => (i - (n - 1) / 2) * 3.08, last = m.step === STEPS.length - 1;
+    $('menu-note').textContent = `Step ${m.step + 1} of ${STEPS.length}: ${st.title}`;
+    const cards = list.map((v, i) => {
+      const html = st.color ? `<i class="swatch" style="background:${cssOf(v)}"></i>` : st.text ? `<h3 class="word">${v}</h3>`
+        : `<img class="${st.full ? 'full' : ''}" src="${portrait(this.renderer, makeHero({ ...m.c, [st.key]: v }), 224, st.full)}" alt=""><h3>${LOOKS[v] || cap(v)}</h3>`;
+      return { x: xs(i), y: 2.5, w: 2.84, h: 2.3, cls: 'hero opt', repeat: true, colors: [cssOf(m.c.main), '#2a2148'], html: html + (m.c[st.key] === v ? '<span class="bestv">Picked</span>' : ''), onSelect: () => { m.c[st.key] = v; this.wearDraft(); this.showCreator(); } };
+    });
+    if (pages > 1) cards.push({ x: xs(n - 1), y: 2.5, w: 2.84, h: 2.3, cls: 'hero', repeat: true, colors: ['#8f6bff', '#5a35d6'], html: `${ICONS.more}<h3>More</h3><p>Page ${pg + 1} of ${pages}</p>`, onSelect: () => { m.page = pg + 1; this.showCreator(); } });
+    cards.push(this.sideButton(-6.85, `${ICONS.back}<h3>Back</h3>`, ['#8f6bff', '#5a35d6'], () => { if (m.step === 0) this.leaveCreator(false); else { m.step--; m.page = 0; this.showCreator(); } }, { repeat: m.step > 0 }));
+    cards.push(this.sideButton(6.85, last ? `${ICONS.ok}<h3>Done</h3>` : `${ICONS.more}<h3>Next</h3>`, ['#2fe0a0', '#12a877'], () => { if (last) this.leaveCreator(true); else { m.step++; m.page = 0; this.showCreator(); } }, { repeat: !last }));
+    this.hud.setButtons(cards);
+  }
+  leaveCreator(save) {
+    const { slot, c } = this.make; this.make = null; this.hud.only = null;
+    if (save) { this.heroes.keep(slot, c); this.audio.fanfare(); } else this.heroes.wear(slot, null);
+    this.dress(slot); this.heroPage = save ? Math.floor((this.heroes.roster.length - 1) / 4) : 0; this.enterHeroes();
   }
   toMenu() { if (this.busy) return; this.busy = true; this.hud.wipe('#9a5bff', () => this.enterMenu()).then(() => { this.busy = false; }); }
   enterGenre(G) {

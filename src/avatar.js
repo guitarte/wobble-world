@@ -21,20 +21,28 @@ const G = {
   star: (() => { const s = new THREE.Shape(); for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2 + Math.PI / 2, r = i % 2 ? 0.45 : 1; s[i ? 'lineTo' : 'moveTo'](Math.cos(a) * r, Math.sin(a) * r); } return new THREE.ExtrudeGeometry(s, { depth: 0.3, bevelEnabled: false }); })(),
 };
 
-// name, hoodie, trousers, accent, skin, hair, lower-leg colour, glove colour, style flags
+// A hero is plain data: colours, a hair style, an emblem and optional extras.
+//   hairStyle: spikes | tails | quiff | flow | afro | mohawk | bob | pony | buns | cap
+//   extra: scarf | cape | none      long: long sleeves      flare: flared cuffs and trousers
 export const HEROES = [
-  { name: 'Ember', main: 0xff4d6d, dark: 0x2b2d6e, accent: 0xffd23f, skin: 0xffcfa8, hair: 0xf1ecff, shin: 0x2b2d6e, glove: 0xffffff, shoe: 0xff4d6d, emblem: 'flame', long: true },
-  { name: 'Zeph', main: 0x19c9c0, dark: 0x27407a, accent: 0xff7ab8, skin: 0xa5694a, hair: 0x4046d8, shin: 0xffffff, glove: 0xffffff, shoe: 0xff7ab8, emblem: 'wave', long: false },
-  { name: 'Volt', main: 0xffc21a, dark: 0x3b2f86, accent: 0x23e6ff, skin: 0xf6c9a0, hair: 0x2f7bff, shin: 0x3b2f86, glove: 0x23e6ff, shoe: 0x23e6ff, emblem: 'bolt', long: true },
-  { name: 'Nova', main: 0x9a5bff, dark: 0x2c1d66, accent: 0x7dffb0, skin: 0x6f4530, hair: 0xff8fe0, shin: 0x2c1d66, glove: 0x7dffb0, shoe: 0xffffff, emblem: 'star', long: true, flare: true },
-  { name: 'Dot', main: 0xf6f2ff, dark: 0x2c1d66, accent: 0xff4fa3, skin: 0xcf9468, hair: 0x2a2358, shin: 0x2c1d66, glove: 0xffffff, shoe: 0xff4fa3, emblem: 'note', long: true },
+  { id: 'ember', name: 'Ember', main: 0xff4d6d, dark: 0x2b2d6e, accent: 0xffd23f, skin: 0xffcfa8, hair: 0xf1ecff, shin: 0x2b2d6e, glove: 0xffffff, shoe: 0xff4d6d, emblem: 'flame', long: true, hairStyle: 'spikes', extra: 'scarf' },
+  { id: 'zeph', name: 'Zeph', main: 0x19c9c0, dark: 0x27407a, accent: 0xff7ab8, skin: 0xa5694a, hair: 0x4046d8, shin: 0xffffff, glove: 0xffffff, shoe: 0xff7ab8, emblem: 'wave', long: false, hairStyle: 'tails' },
+  { id: 'volt', name: 'Volt', main: 0xffc21a, dark: 0x3b2f86, accent: 0x23e6ff, skin: 0xf6c9a0, hair: 0x2f7bff, shin: 0x3b2f86, glove: 0x23e6ff, shoe: 0x23e6ff, emblem: 'bolt', long: true, hairStyle: 'quiff' },
+  { id: 'nova', name: 'Nova', main: 0x9a5bff, dark: 0x2c1d66, accent: 0x7dffb0, skin: 0x6f4530, hair: 0xff8fe0, shin: 0x2c1d66, glove: 0x7dffb0, shoe: 0xffffff, emblem: 'star', long: true, flare: true, hairStyle: 'flow' },
+  { id: 'koa', name: 'Koa', main: 0xff8a3d, dark: 0x1f4a5c, accent: 0x8dff5a, skin: 0x8a5637, hair: 0x2b1b3f, shin: 0x1f4a5c, glove: 0xffffff, shoe: 0x8dff5a, emblem: 'paw', long: false, hairStyle: 'afro' },
+  { id: 'rex', name: 'Rex', main: 0x6fd934, dark: 0x3a2a5c, accent: 0xff5a36, skin: 0xf2c49a, hair: 0x16b8a6, shin: 0x3a2a5c, glove: 0xff5a36, shoe: 0xffffff, emblem: 'claw', long: true, hairStyle: 'mohawk', extra: 'cape' },
+  { id: 'lumi', name: 'Lumi', main: 0x4d8dff, dark: 0x1d2a6b, accent: 0xfff06a, skin: 0xffdcc2, hair: 0xc9a3ff, shin: 0xffffff, glove: 0xfff06a, shoe: 0xfff06a, emblem: 'moon', long: true, flare: true, hairStyle: 'bob' },
+  { id: 'mika', name: 'Mika', main: 0xf04ad0, dark: 0x2a2148, accent: 0x52f0ff, skin: 0xc98a5e, hair: 0x241a3a, shin: 0x2a2148, glove: 0xffffff, shoe: 0x52f0ff, emblem: 'heart', long: false, hairStyle: 'pony' },
 ];
+export const COACH = { id: 'dot', name: 'Dot', main: 0xf6f2ff, dark: 0x2c1d66, accent: 0xff4fa3, skin: 0xcf9468, hair: 0x2a2358, shin: 0x2c1d66, glove: 0xffffff, shoe: 0xff4fa3, emblem: 'note', long: true, hairStyle: 'cap' };
+export const HAIR_STYLES = ['spikes', 'tails', 'quiff', 'flow', 'afro', 'mohawk', 'bob', 'pony', 'buns'];
+export const EMBLEMS = ['flame', 'wave', 'bolt', 'star', 'paw', 'claw', 'moon', 'heart', 'note'];
 const css = (hex) => '#' + new THREE.Color(hex).getHexString();
 
 // ------------------------------------------------------------------ faces
 const FACE_CACHE = new Map();
 function faceTexture(hero, expr) {
-  const key = hero.name + expr + hero.accent; if (FACE_CACHE.has(key)) return FACE_CACHE.get(key);
+  const key = expr + '|' + hero.accent + '|' + hero.hair; if (FACE_CACHE.has(key)) return FACE_CACHE.get(key);
   const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
   const ink = '#1a1030', iris = css(hero.accent === 0xffd23f ? 0xff8a1f : hero.accent), brow = new THREE.Color(hero.hair).getHSL({}).l > 0.75 ? '#5b4a9a' : css(tint(hero.hair, 0x000000, 0.35));
   g.lineCap = 'round'; g.lineJoin = 'round';
@@ -93,6 +101,10 @@ function emblemTexture(kind, color) {
   else if (kind === 'star') { for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2 - Math.PI / 2, r = i % 2 ? 24 : 54; g[i ? 'lineTo' : 'moveTo'](64 + Math.cos(a) * r, 66 + Math.sin(a) * r); } g.closePath(); }
   else if (kind === 'flame') { g.moveTo(64, 10); g.bezierCurveTo(112, 50, 108, 118, 64, 118); g.bezierCurveTo(20, 118, 18, 70, 44, 46); g.bezierCurveTo(46, 66, 58, 66, 64, 10); g.closePath(); }
   else if (kind === 'wave') { g.moveTo(12, 84); g.bezierCurveTo(30, 20, 78, 20, 84, 62); g.bezierCurveTo(86, 80, 66, 82, 66, 66); g.bezierCurveTo(52, 96, 96, 104, 116, 74); g.bezierCurveTo(112, 118, 30, 124, 12, 84); g.closePath(); }
+  else if (kind === 'heart') { g.moveTo(64, 112); g.bezierCurveTo(8, 72, 14, 20, 44, 20); g.bezierCurveTo(56, 20, 64, 30, 64, 40); g.bezierCurveTo(64, 30, 72, 20, 84, 20); g.bezierCurveTo(114, 20, 120, 72, 64, 112); g.closePath(); }
+  else if (kind === 'moon') { g.arc(60, 64, 46, 0.7, Math.PI * 2 - 0.7); g.arc(86, 64, 34, Math.PI * 2 - 1.05, 1.05, true); g.closePath(); }
+  else if (kind === 'paw') { g.ellipse(64, 84, 28, 23, 0, 0, 7); for (const [x, y] of [[26, 56], [50, 32], [80, 32], [104, 56]]) { g.moveTo(x + 12, y); g.ellipse(x, y, 12, 15, 0, 0, 7); } }
+  else if (kind === 'claw') { for (const x of [26, 54, 82]) { g.moveTo(x, 16); g.lineTo(x + 22, 16); g.lineTo(x + 6, 112); g.lineTo(x - 2, 60); g.closePath(); } }
   else { g.ellipse(44, 96, 20, 15, -0.3, 0, 7); g.moveTo(108, 84); g.ellipse(92, 84, 18, 14, -0.3, 0, 7); g.moveTo(62, 92); g.lineTo(62, 26); g.lineTo(108, 14); g.lineTo(108, 80); g.lineTo(98, 80); g.lineTo(98, 34); g.lineTo(72, 41); g.lineTo(72, 92); g.closePath(); }
   g.stroke(); g.fill();
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; EMBLEM_CACHE.set(key, t); return t;
@@ -144,10 +156,9 @@ class Ribbon {
 
 // ------------------------------------------------------------------ the hero
 export class Avatar {
-  // color is used for the coach's accent; style picks the hero (0-3 players, 4 coach)
-  constructor(color, style = 0) {
-    this.group = new THREE.Group(); this.style = style;
-    const H = this.hero = style === 4 ? { ...HEROES[4], accent: color, shoe: color } : HEROES[style % 4];
+  constructor(hero) {
+    this.group = new THREE.Group();
+    const H = this.hero = hero;
     const rim = tint(H.accent, 0xffffff, 0.45);
     const tm = (c, o = {}) => toonMat(c, { rim, ...o });
     this.ink = inkMat(0.04); this.inkThin = inkMat(0.025);
@@ -157,7 +168,7 @@ export class Avatar {
     const M = this.mat;
 
     this.torso = mk(G.torso, M.main); this.hem = mk(G.band, M.accent); this.pelvis = mk(G.sphere, M.dark);
-    this.neck = mk(G.band, M.skin); this.collar = mk(G.torus, style === 0 ? M.accent : M.main);
+    this.neck = mk(G.band, M.skin); this.collar = mk(G.torus, H.extra === 'scarf' ? M.accent : M.main);
     this.emblem = new THREE.Mesh(G.disc, new THREE.MeshBasicMaterial({ map: emblemTexture(H.emblem, H.accent), transparent: true, depthWrite: false })); this.group.add(this.emblem);
     const sleeve = M.main, fore = H.long ? M.main : M.skin;
     this.segs = {
@@ -175,7 +186,7 @@ export class Avatar {
     this.faceMat = new THREE.MeshBasicMaterial({ map: faceTexture(H, 'neutral'), transparent: true, depthWrite: false });
     this.face = new THREE.Mesh(G.face, this.faceMat); this.face.renderOrder = 2; this.head.add(this.face);
     this.ribbons = []; this.wobblers = [];
-    this.buildHair(style, mk);
+    this.buildHair(H.hairStyle, mk);
 
     this.shadow = new THREE.Mesh(G.disc, new THREE.MeshBasicMaterial({ color: 0x140c2a, transparent: true, opacity: 0.3, depthWrite: false })); this.shadow.rotation.x = -Math.PI / 2; this.shadow.renderOrder = -1; this.group.add(this.shadow);
     this.pop = 0; this.popV = 0; this.blinkT = 2; this.happy = 0; this.wow = 0; this.grit = 0; this.bounce = 0; this.spring = 0; this.springV = 0; this.lastHeadX = 0; this.flash = 0; this.expr = 'neutral';
@@ -189,12 +200,15 @@ export class Avatar {
     const M = this.mat, H = this.hero, hd = this.head, hair = M.hair;
     const cap = mk(G.sphere, hair, hd); cap.scale.set(1.07, 1.04, 1.06); cap.position.set(0, 0.2, -0.16);
     const rib = (o) => { const r = new Ribbon(this.group, o); this.ribbons.push(r); return r; };
-    if (style === 0) { // Ember: swept-back spikes and a long scarf
+    // things that trail from the neck
+    if (H.extra === 'scarf') for (const sg of [-1, 1]) rib({ anchor: [sg * 0.25, 0, -0.55, 'neck'], n: 11, len: 1.55 + sg * 0.2, width: 0.13, tip: 0.55, color: H.accent, z: -0.42 + sg * 0.03, wind: 0.9, stiff: 0.02, flutter: 0.45, rate: 6 + sg, rest: [0.62, -0.78] });
+    if (H.extra === 'cape') for (const k of [-1, 0, 1]) rib({ anchor: [k * 0.34, -0.02, -0.5, 'neck'], n: 9, len: 1.75 - Math.abs(k) * 0.12, width: 0.3, tip: 0.9, color: H.accent, z: -0.44 - Math.abs(k) * 0.02, wind: 0.5, stiff: 0.04, flutter: 0.3, rate: 5 + k, rest: [k * 0.16, -0.98] });
+    const fringe = (list, rad = 0.24) => { for (const [x, tilt, len] of list) this.spike(mk, hair, [x, 0.72, 0.78], [tilt, -1, 0.12], len, rad, 0.55); };
+    if (style === 'spikes') { // swept-back spikes
       const sp = [[-0.75, 0.75, -0.1, -0.9, 0.7, -0.2, 0.85, 0.36], [-0.35, 1.05, 0, -0.45, 1, 0, 1.0, 0.4], [0.1, 1.15, -0.05, 0.15, 1, -0.1, 1.15, 0.42], [0.55, 1.0, -0.1, 0.7, 0.85, -0.1, 1.0, 0.4], [0.85, 0.6, -0.15, 1, 0.45, -0.2, 0.8, 0.34], [-0.2, 0.9, -0.7, -0.2, 0.7, -0.8, 0.9, 0.4], [0.4, 0.85, -0.7, 0.4, 0.6, -0.8, 0.85, 0.38]];
       for (const s of sp) this.spike(mk, hair, s.slice(0, 3), s.slice(3, 6), s[6], s[7]);
       for (const [x, tilt, len] of [[-0.5, 0.35, 0.55], [-0.12, 0.1, 0.7], [0.3, -0.25, 0.6], [0.66, -0.5, 0.45]]) this.spike(mk, hair, [x, 0.72, 0.78], [tilt, -1, 0.12], len, 0.24, 0.55);
-      for (const sg of [-1, 1]) rib({ anchor: [sg * 0.25, 0, -0.55, 'neck'], n: 11, len: 1.55 + sg * 0.2, width: 0.13, tip: 0.55, color: H.accent, z: -0.42 + sg * 0.03, wind: 0.9, stiff: 0.02, flutter: 0.45, rate: 6 + sg, rest: [0.62, -0.78] });
-    } else if (style === 1) { // Zeph: twin tails with pink ties and a blunt fringe
+    } else if (style === 'tails') { // twin tails with ties and a blunt fringe
       for (const sg of [-1, 1]) {
         const bun = mk(G.sphere, hair, hd); bun.scale.setScalar(0.4); bun.position.set(sg * 0.8, 0.9, -0.1);
         const tie = mk(G.torus, M.accent, hd); tie.scale.setScalar(0.2); tie.position.set(sg * 0.7, 0.72, -0.1); tie.rotation.set(Math.PI / 2, sg * 0.6, 0);
@@ -202,7 +216,7 @@ export class Avatar {
       }
       for (let k = -2; k <= 2; k++) this.spike(mk, hair, [k * 0.3, 0.8 - Math.abs(k) * 0.04, 0.74 - Math.abs(k) * 0.06], [k * 0.08, -1, 0.14], 0.5 - Math.abs(k) * 0.04, 0.2, 0.5);
       const band = mk(G.arc, M.accent, hd, this.inkThin); band.scale.set(1.13, 1.13, 1.7); band.position.set(0, 0.16, -0.02); band.rotation.x = -0.12;
-    } else if (style === 2) { // Volt: lightning quiff, goggles pushed up
+    } else if (style === 'quiff') { // lightning quiff, goggles pushed up
       for (const [b, d, l, r] of [[[-0.25, 0.85, 0.35], [-0.25, 0.9, 0.55], 1.0, 0.4], [[0.15, 0.95, 0.3], [0.3, 1, 0.5], 1.35, 0.46], [[0.5, 0.85, 0.15], [0.9, 0.75, 0.3], 1.05, 0.4], [[-0.7, 0.75, -0.1], [-1, 0.55, -0.1], 0.7, 0.34], [[0.85, 0.5, -0.2], [1, 0.2, -0.3], 0.6, 0.3], [[0, 0.9, -0.6], [0, 0.6, -1], 0.8, 0.4]]) this.spike(mk, hair, b, d, l, r);
       for (const [x, tilt, len] of [[-0.45, 0.3, 0.4], [0.5, -0.4, 0.42]]) this.spike(mk, hair, [x, 0.74, 0.78], [tilt, -1, 0.1], len, 0.22, 0.55);
       const strap = mk(G.thin, M.dark, hd, null); strap.scale.setScalar(1.05); strap.rotation.x = Math.PI / 2 - 0.18; strap.position.y = 0.52;
@@ -211,13 +225,41 @@ export class Avatar {
         const lens = new THREE.Mesh(G.disc, new THREE.MeshBasicMaterial({ color: 0xd8fbff })); lens.scale.setScalar(0.2); lens.position.set(sg * 0.34, 0.6, 0.9); lens.rotation.x = -0.3; hd.add(lens);
         rib({ anchor: [sg * 0.3, 0.45, -0.95, 'head'], n: 6, len: 0.9, width: 0.07, tip: 0.6, color: H.accent, z: -0.4, wind: 1.4, stiff: 0.02, rest: [0.8, -0.5] });
       }
-    } else if (style === 3) { // Nova: long flowing hair, a star clip and one curl that will not sit down
+    } else if (style === 'flow') { // long flowing hair, a star clip and one curl that will not sit down
       for (const sg of [-1, 1]) this.spike(mk, hair, [sg * 0.9, 0.42, 0.3], [sg * 0.18, -1, 0.05], 1.5, 0.27, 0.6);
       for (const [x, tilt, len] of [[-0.42, 0.5, 0.62], [0, 0.15, 0.5], [0.4, -0.45, 0.66]]) this.spike(mk, hair, [x, 0.76, 0.76], [tilt, -1, 0.12], len, 0.3, 0.5);
       for (const k of [-1, 0, 1]) rib({ anchor: [k * 0.55, 0.1, -0.7, 'head'], n: 8, len: 1.9 - Math.abs(k) * 0.25, width: 0.24, color: H.hair, z: -0.4 - Math.abs(k) * 0.02, wind: 0.6, stiff: 0.025, rest: [k * 0.3, -0.95], shape: 'leaf' });
       const piv = new THREE.Group(); piv.position.set(0.1, 1.2, 0); hd.add(piv); const curl = mk(G.cone, hair, piv, this.inkThin); curl.scale.set(0.09, 0.6, 0.09); curl.rotation.z = -0.5; piv.userData.base = 0; this.wobblers.push(piv);
       const clip = mk(G.star, M.accent, hd, this.inkThin); clip.scale.setScalar(0.2); clip.position.set(0.66, 0.6, 0.72); clip.rotation.set(0, 0.6, 0.3);
-    } else { // Dot the coach: cap on backwards, headphones, ponytail
+    } else if (style === 'afro') { // a big round cloud of curls and a sweatband
+      hair.uniforms.uSpec.value = 0; // curls do not shine in one streak
+      const big = mk(G.sphere, hair, hd); big.scale.set(1.42, 1.3, 1.3); big.position.set(0, 0.52, -0.22);
+      for (let i = 0; i < 9; i++) { const a = i / 9 * Math.PI * 2, puff = mk(G.sphere, hair, hd); puff.scale.setScalar(0.5 + (i % 3) * 0.06); puff.position.set(Math.cos(a) * 1.18, 0.62 + Math.sin(a) * 1.0, -0.2 + (i % 2) * 0.16); }
+      for (const [x, y] of [[-0.5, 0.86], [0, 0.94], [0.5, 0.86]]) { const puff = mk(G.sphere, hair, hd); puff.scale.setScalar(0.36); puff.position.set(x, y, 0.62); }
+      const band = mk(G.arc, M.accent, hd, this.inkThin); band.scale.set(1.08, 1.08, 2.2); band.position.set(0, 0.3, 0.02); band.rotation.x = -0.5;
+    } else if (style === 'mohawk') { // a tall crest from front to back
+      for (let i = 0; i < 7; i++) { const u = i / 6, a = -0.75 + u * 2.3; this.spike(mk, hair, [0, 0.55 + Math.cos(a) * 0.5, Math.sin(-a) * 0.75 + 0.1], [0, Math.cos(a) + 0.35, -Math.sin(a) * 0.9], 1.5 - Math.abs(u - 0.35) * 0.9, 0.36, 0.42); }
+      fringe([[-0.16, 0.2, 0.34], [0.16, -0.2, 0.34]], 0.2);
+      for (const sg of [-1, 1]) { const stud = mk(G.sphere, M.accent, hd, this.inkThin); stud.scale.setScalar(0.09); stud.position.set(sg * 1.0, -0.3, 0.1); }
+    } else if (style === 'bob') { // a neat bob with a big bow
+      for (const sg of [-1, 1]) { const side = mk(G.sphere, hair, hd); side.scale.set(0.42, 0.95, 0.78); side.position.set(sg * 0.86, -0.18, -0.12); }
+      const back = mk(G.sphere, hair, hd); back.scale.set(1.02, 1.0, 0.7); back.position.set(0, -0.2, -0.55);
+      for (let k = -2; k <= 2; k++) this.spike(mk, hair, [k * 0.3, 0.8 - Math.abs(k) * 0.04, 0.74 - Math.abs(k) * 0.06], [k * 0.05, -1, 0.14], 0.46, 0.21, 0.5);
+      for (const sg of [-1, 1]) { const loop = mk(G.cone, M.accent, hd, this.inkThin); loop.position.set(0.3, 1.14, 0.2); tA.set(sg, 0.3, 0).normalize(); loop.quaternion.setFromUnitVectors(UP, tA); loop.scale.set(0.46, 0.8, 0.22); }
+      const knot = mk(G.sphere, M.accent, hd, this.inkThin); knot.scale.setScalar(0.2); knot.position.set(0.3, 1.14, 0.24);
+    } else if (style === 'pony') { // a high ponytail, a swept fringe and a visor
+      fringe([[-0.5, 0.55, 0.6], [-0.1, 0.4, 0.66], [0.3, 0.25, 0.5], [0.62, -0.1, 0.36]], 0.27);
+      const tie = mk(G.torus, M.accent, hd); tie.scale.setScalar(0.22); tie.position.set(0, 1.06, -0.52); tie.rotation.x = Math.PI / 2 - 0.5;
+      rib({ anchor: [0, 1.12, -0.6, 'head'], n: 9, len: 2.0, width: 0.24, color: H.hair, z: -0.4, wind: 0.9, stiff: 0.02, rest: [0.3, -0.95], shape: 'leaf' });
+      const visor = mk(G.sphere, M.accent, hd, this.inkThin); visor.scale.set(0.82, 0.07, 0.5); visor.position.set(0, 0.62, 0.95); visor.rotation.x = 0.3;
+    } else if (style === 'buns') { // two buns on top and a soft fringe
+      for (const sg of [-1, 1]) {
+        const bun = mk(G.sphere, hair, hd); bun.scale.setScalar(0.5); bun.position.set(sg * 0.72, 1.02, -0.12);
+        const tie = mk(G.torus, M.accent, hd); tie.scale.setScalar(0.2); tie.position.set(sg * 0.62, 0.8, -0.1); tie.rotation.set(Math.PI / 2, sg * 0.6, 0);
+        this.spike(mk, hair, [sg * 0.92, 0.3, 0.32], [sg * 0.12, -1, 0.05], 0.75, 0.2, 0.6);
+      }
+      fringe([[-0.4, 0.35, 0.5], [0, 0, 0.42], [0.4, -0.35, 0.5]], 0.28);
+    } else { // the coach: cap on backwards, headphones, ponytail
       const brim = mk(G.sphere, M.accent, hd); brim.scale.set(0.7, 0.1, 0.6); brim.position.set(0, 0.78, -1.05); brim.rotation.x = 0.35;
       const crown = mk(G.sphere, M.accent, hd); crown.scale.set(1.09, 0.8, 1.08); crown.position.set(0, 0.5, -0.12);
       for (const [x, tilt, len] of [[-0.3, 0.3, 0.42], [0.1, 0, 0.5], [0.45, -0.4, 0.4]]) this.spike(mk, M.hair, [x, 0.62, 0.84], [tilt, -1, 0.15], len, 0.24, 0.5);
@@ -290,7 +332,7 @@ export class Avatar {
     // neck and collar
     tC.set(j.chest.x, j.chest.y + 0.08 * S, 0.02 * S); tB.set(hx, hy - R * 0.6, 0.06 * S);
     this.seg(this.neck, tC, tB, 0.085 * S, 0.04 * S);
-    this.collar.position.set(j.chest.x, j.chest.y + 0.13 * S, 0.03 * S); this.collar.quaternion.copy(q); this.collar.rotateX(Math.PI / 2 - 0.28); this.collar.scale.set(0.24 * S, 0.21 * S, (this.style === 0 ? 0.3 : 0.2) * S);
+    this.collar.position.set(j.chest.x, j.chest.y + 0.13 * S, 0.03 * S); this.collar.quaternion.copy(q); this.collar.rotateX(Math.PI / 2 - 0.28); this.collar.scale.set(0.24 * S, 0.21 * S, (this.hero.extra === 'scarf' ? 0.3 : 0.2) * S);
 
     // springy bits follow the head
     const hv = (hx - this.lastHeadX) / Math.max(dt, 1e-3); this.lastHeadX = hx;
