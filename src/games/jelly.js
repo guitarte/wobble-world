@@ -166,11 +166,11 @@ export class JellyJam {
   // The boss floats above the players and takes a hit from every fast punch.
   updateKing(it, dt, t, players, pulse) {
     const { fx, audio, hud } = this.app, m = it.mesh, ud = m.userData, q = it.squash;
-    it.x += (Math.sin(t * 0.7) * 3.6 - it.x) * Math.min(1, dt * 1.5); it.y += (1.25 + Math.sin(t * 1.1) * 0.75 - it.y) * Math.min(1, dt * 1.6);
+    it.x += (Math.sin(t * 0.7) * 3.6 - it.x) * Math.min(1, dt * 1.5); it.y += (1.9 + Math.sin(t * 1.1) * 0.6 - it.y) * Math.min(1, dt * 1.6);
     m.position.set(it.x + (Math.random() - 0.5) * q * 0.15, it.y, -0.3);
     m.scale.set(it.r * (1 + q * 0.18 - pulse * 0.05), it.r * (1 - q * 0.2 + pulse * 0.06), it.r); m.rotation.z = Math.sin(t * 1.3) * 0.12;
     ud.tents.forEach((tn, k) => { tn.rotation.z = Math.sin(t * 5 + k) * 0.35; });
-    ud.mat.uniforms.uFlash.value = ud.light.uniforms.uFlash.value = q > 0.6 ? 0.8 : 0;
+    ud.mat.uniforms.uFlash.value = ud.light.uniforms.uFlash.value = q > 0.75 ? 0.5 : 0;
     for (const p of players) for (let h = 0; h < 2; h++) {
       const hd = p.rig.hands[h]; if (it.cool > 0 || it.hp <= 0 || Math.hypot(hd.x - it.x, hd.y - it.y) > it.r + 0.3 * p.rig.S || p.rig.handVel[h].length() < 2.2 * p.rig.S) continue;
       const pos = { x: (hd.x + it.x) / 2, y: (hd.y + it.y) / 2, z: 0.6 };
@@ -193,9 +193,9 @@ export class JellyJam {
   botIntent(i, p, bot, t, playing) {
     if (!playing || !p) return {};
     const sx = bot.x, sy = bot.floor + bot.h * 0.8, reach = bot.h * 0.36;
-    if (this.king && this.king.y < 3.2) { // run under the king and punch upward with both fists in turn
+    if (this.king && this.king.y < 3.6) { // run under the king and punch upward with both fists in turn
       const k = this.king, up = Math.sin(t * 13 + i) > 0;
-      return { x: k.x + (i - 1.5) * 0.9, hands: [{ x: k.x - 0.5, y: up ? k.y - 0.6 : sy - 0.4 }, { x: k.x + 0.5, y: up ? sy - 0.4 : k.y - 0.6 }], handSpeed: 14 };
+      const bx = k.x + (i - 1) * 1.7; return { x: bx, hands: [{ x: bx - 0.4, y: up ? k.y - 0.4 : sy - 0.4 }, { x: bx + 0.4, y: up ? sy - 0.4 : k.y - 0.4 }], handSpeed: 14 };
     }
     const cands = this.items.filter(it => it.type !== 'urchin' && it.type !== 'king' && !it.dead && it.y > bot.floor && it.y < bot.floor + bot.h * 1.25).map(it => ({ it, d: Math.hypot(it.x - sx, it.y - sy) })).sort((a, b) => a.d - b.d);
     const hands = [null, null]; let goX;

@@ -179,7 +179,7 @@ export class Avatar {
 
     this.shadow = new THREE.Mesh(G.disc, new THREE.MeshBasicMaterial({ color: 0x140c2a, transparent: true, opacity: 0.3, depthWrite: false })); this.shadow.rotation.x = -Math.PI / 2; this.shadow.renderOrder = -1; this.group.add(this.shadow);
     this.pop = 0; this.popV = 0; this.blinkT = 2; this.happy = 0; this.wow = 0; this.grit = 0; this.bounce = 0; this.spring = 0; this.springV = 0; this.lastHeadX = 0; this.flash = 0; this.expr = 'neutral';
-    this.headC = new THREE.Vector3(); this.headQ = new THREE.Quaternion(); this.R = 0.4;
+    this.R = 0.4; this.yaw = 0; this.roll = 0;
   }
 
   spike(mk, mat, base, dir, len, rad, flat = 1) {
@@ -282,8 +282,10 @@ export class Avatar {
     const hx = j.nose.x, hy = Math.max(j.nose.y + 0.05 * S, j.chest.y + 0.47 * S);
     this.head.position.set(hx, hy, 0.12 * S); this.head.scale.setScalar(R);
     const ex = j.earR.x - j.earL.x, ey = j.earR.y - j.earL.y, ed = Math.hypot(ex, ey) || 1;
-    const roll = THREE.MathUtils.clamp(Math.atan2(ey, Math.abs(ex) + 1e-3), -0.6, 0.6);
-    const yaw = THREE.MathUtils.clamp((j.nose.x - (j.earL.x + j.earR.x) / 2) / ed * 1.4, -0.65, 0.65);
+    const hk = Math.min(1, dt * 12); // ease the head so jittery ear tracking cannot make it twitch
+    this.roll += (THREE.MathUtils.clamp(Math.atan2(ey, Math.abs(ex) + 1e-3), -0.6, 0.6) - this.roll) * hk;
+    this.yaw += (THREE.MathUtils.clamp((j.nose.x - (j.earL.x + j.earR.x) / 2) / ed * 1.4, -0.65, 0.65) - this.yaw) * hk;
+    const roll = this.roll, yaw = this.yaw;
     this.head.rotation.set(0, yaw, roll);
     // neck and collar
     tC.set(j.chest.x, j.chest.y + 0.08 * S, 0.02 * S); tB.set(hx, hy - R * 0.6, 0.06 * S);
