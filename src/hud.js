@@ -77,15 +77,16 @@ export class HUD {
   fire(b) { if (b.fired) return; b.fired = true; b.el.classList.add('fired'); this.app.audio.select(); b.onSelect(); }
   updateButtons(players, dt) {
     let n = 0; const show = this.buttons.some(b => !b.quiet);
+    const gain = this.app.tracker.reachGain, cx = (x) => Math.max(-7.8, Math.min(7.8, x * gain));
     for (const p of players) for (let h = 0; h < 2; h++) {
       const c = this.cursors[p.slot * 2 + h], pos = p.rig.hands[h];
-      c.style.transform = `translate(calc(${pos.x} * var(--u)), calc(${-pos.y} * var(--u)))`; c.classList.toggle('on', show); c.dataset.live = '1'; n++;
+      c.style.transform = `translate(calc(${cx(pos.x)} * var(--u)), calc(${-pos.y} * var(--u)))`; c.classList.toggle('on', show); c.dataset.live = '1'; n++;
     }
     for (const c of this.cursors) { if (!c.dataset.live) c.classList.remove('on'); delete c.dataset.live; }
     for (const b of this.buttons) {
       if (b.fired) continue;
       let hot = false; const m = 0.15;
-      for (const p of players) for (const hnd of p.rig.hands) if (Math.abs(hnd.x - b.x) < b.w / 2 + m && Math.abs(hnd.y - b.y) < b.h / 2 + m) hot = true;
+      for (const p of players) for (const hnd of p.rig.hands) if (Math.abs(cx(hnd.x) - b.x) < b.w / 2 + m && Math.abs(hnd.y - b.y) < b.h / 2 + m) hot = true;
       if (hot && !b.hot) this.app.audio.hover();
       b.hot = hot; b.p = Math.max(0, Math.min(1, b.p + (hot ? dt / b.dwell : -dt * 1.8)));
       b.el.classList.toggle('hot', hot); b.el.style.setProperty('--p', b.p.toFixed(3));

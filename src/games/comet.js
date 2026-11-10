@@ -29,7 +29,7 @@ export class CometKeeper {
     let tx, ty;
     if (type === 'mine') { tx = p.j.hipC.x; ty = floor + 0.62 * H; }
     else { for (let k = 0; k < 6; k++) { tx = p.j.hipC.x + rnd(-0.44, 0.44) * H; ty = floor + rnd(0.28, 1.2) * H; if (!avoid || Math.hypot(tx - avoid.tx, ty - avoid.ty) > 1.6) break; } }
-    tx = THREE.MathUtils.clamp(tx, -7.3, 7.3); ty = THREE.MathUtils.clamp(ty, -4, 4);
+    const half = this.app.tracker.playHalf - 0.3; tx = THREE.MathUtils.clamp(tx, -half, half); ty = THREE.MathUtils.clamp(ty, -4, 4);
     const g = new THREE.Group();
     if (type === 'mine') {
       const m = new THREE.Mesh(mineGeo, new THREE.MeshStandardMaterial({ color: 0x2a0f3f, roughness: 0.4, flatShading: true, emissive: 0xff2060, emissiveIntensity: 0.5 })); g.add(m);

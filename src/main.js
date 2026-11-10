@@ -76,7 +76,10 @@ class App {
       await this.tracker.startCamera(qs.get('cam') === 'back' ? 'environment' : 'user');
       msg.textContent = 'Loading body tracking…';
       await this.tracker.loadModel(new URL('.', document.baseURI).href);
-      const v = $('pipv'); v.srcObject = this.tracker.stream; v.play().catch(() => {});
+      $('pip').prepend(this.tracker.canvas);
+      if (qs.has('rot')) this.tracker.setRotation(+qs.get('rot'));
+      $('b-rot').addEventListener('click', () => { this.tracker.setRotation(this.tracker.rotation + 90); this.manualRot = true; });
+      this.tracker.onRotate = () => { if (this.phase === 'menu') this.hud.banner('Camera turned', '#fff', 1.1); };
       this.begin();
     } catch (e) {
       console.warn(e); btn.disabled = false;
@@ -208,6 +211,7 @@ class App {
     if (players.length) this.floorY += (THREE.MathUtils.clamp(fy / players.length, -4.4, -1.5) - this.floorY) * Math.min(1, dt * 2);
     this.env.update(dt, t, this.floorY, this.audio.ready ? this.audio.beat : t * 2);
 
+    this.tracker.autoRotate = this.phase === 'menu' && !this.manualRot && !qs.has('rot');
     if (this.phase === 'menu') this.hud.hint(players.length ? '' : (this.sim ? '' : 'Step in front of the camera to join'));
     else if (this.phase === 'intro') {
       this.phaseT -= dt; this.game.idle?.(dt, t);

@@ -127,9 +127,15 @@ export class Tracker {
     this.video = null; this.landmarker = null; this.mode = 'none';
     this.stageW = 16; this.stageH = STAGE_H; this.lastVideoTime = -1; this.lastDetect = 0;
     this.onJoin = null; this.onLeave = null; this.mirror = true;
+    this.canvas = document.createElement('canvas'); this.ctx = this.canvas.getContext('2d', { alpha: false });
+    this.rotation = 0; this.autoRotate = false; this.sideTurn = 0; this.sideSince = 0;
+    try { this.rotation = (+localStorage.getItem('ww-rot') || 0) % 360; } catch (e) { /* fine */ }
   }
 
   get active() { return this.players.filter(Boolean); }
+  // half-width of the area players can actually reach, and how much to stretch menu cursors to cover the screen
+  get playHalf() { return Math.min(8, this.stageW / 2); }
+  get reachGain() { return 8 / this.playHalf; }
 
   async startCamera(facing = 'user') {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('no-camera-api');
@@ -163,12 +169,15 @@ export class Tracker {
   update(now, dt) {
     if (this.mode === 'camera' && this.video && this.video.readyState >= 2 && this.video.currentTime !== this.lastVideoTime) {
       this.lastVideoTime = this.video.currentTime;
-      const aspect = this.video.videoWidth / Math.max(1, this.video.videoHeight);
+      const frame = this.drawFrame();
+      const aspect = frame.width / Math.max(1, frame.height);
       // fill the 16-wide stage; a squarer camera gets its top and bottom cropped a little
-      this.stageW = Math.max(16, STAGE_H * aspect); this.stageH = this.stageW / aspect;
+      // A tall, narrow picture shows the whole body in the middle of the stage instead.
+      if (aspect >= 1) { this.stageW = Math.max(16, STAGE_H * aspect); this.stageH = this.stageW / aspect; }
+      else { this.stageH = STAGE_H; this.stageW = STAGE_H * aspect; }
       let res = null;
-      try { res = this.landmarker.detectForVideo(this.video, now); } catch (e) { /* skip frame */ }
-      if (res) this.ingest(res.landmarks, now);
+      try { res = this.landmarker.detectForVideo(frame, now); } catch (e) { /* skip frame */ }
+      if (res) { if (this.autoRotate) this.checkUpright(res.landmarks, frame, now); this.ingest(res.landmarks, now); }
     }
     for (let i = 0; i < MAX_PLAYERS; i++) {
       const p = this.players[i]; if (!p) continue;
@@ -181,6 +190,35 @@ export class Tracker {
       p.first = false;
       p.rig.solve(dt);
     }
+  }
+
+  // Copy the camera frame to a canvas, turned so people stand upright. Some
+  // phones and stands deliver the picture sideways.
+  drawFrame() {
+    const v = this.video, vw = v.videoWidth, vh = v.videoHeight, k = Math.min(1, 720 / Math.max(vw, vh));
+    const side = this.rotation % 180 !== 0, cw = Math.round((side ? vh : vw) * k), ch = Math.round((side ? vw : vh) * k);
+    const c = this.canvas; if (c.width !== cw || c.height !== ch) { c.width = cw; c.height = ch; }
+    const g = this.ctx; g.setTransform(1, 0, 0, 1, 0, 0); g.translate(cw / 2, ch / 2); g.rotate(this.rotation * Math.PI / 180); g.drawImage(v, -vw * k / 2, -vh * k / 2, vw * k, vh * k);
+    return c;
+  }
+  setRotation(deg) {
+    this.rotation = ((deg % 360) + 360) % 360; this.sideT = 0;
+    try { localStorage.setItem('ww-rot', this.rotation); } catch (e) { /* fine */ }
+    for (let i = 0; i < MAX_PLAYERS; i++) if (this.players[i]) { const p = this.players[i]; this.players[i] = null; this.onLeave?.(p); }
+    this.onRotate?.(this.rotation);
+  }
+  // If the clearest body in view has been lying sideways or upside down for a
+  // moment, the picture is turned: rotate it so that body stands upright.
+  checkUpright(sets, frame, now) {
+    let turn = 0;
+    for (const lm of sets) {
+      if (!lm || ((lm[11].visibility ?? 1) + (lm[12].visibility ?? 1) + (lm[23].visibility ?? 1) + (lm[24].visibility ?? 1)) / 4 < 0.6) continue;
+      const dx = ((lm[23].x + lm[24].x) - (lm[11].x + lm[12].x)) * frame.width, dy = ((lm[23].y + lm[24].y) - (lm[11].y + lm[12].y)) * frame.height;
+      if (Math.abs(dx) > 1.7 * Math.abs(dy)) turn = dx > 0 ? 90 : 270; else if (dy < 0 && Math.abs(dy) > 1.7 * Math.abs(dx)) turn = 180;
+      break;
+    }
+    if (!turn || turn !== this.sideTurn) { this.sideTurn = turn; this.sideSince = now; return; }
+    if (now - this.sideSince > 1200) { this.sideTurn = 0; this.setRotation(this.rotation + turn); }
   }
 
   // sets: array of 33-landmark arrays in normalized image coordinates

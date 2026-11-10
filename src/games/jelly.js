@@ -51,8 +51,8 @@ export class JellyJam {
     const r = small ? 0.42 : type === 'big' ? 1.2 : type === 'gold' ? 0.52 : urchin ? 0.7 : rnd(0.6, 0.78);
     const players = this.app.players;
     if (x === undefined) {
-      x = rnd(-7.2, 7.2);
-      if (players.length && Math.random() < 0.65) { const p = players[Math.floor(Math.random() * players.length)]; x = THREE.MathUtils.clamp(p.j.hipC.x + rnd(-3.2, 3.2), -7.4, 7.4); }
+      const w = this.app.tracker.playHalf - 0.6; x = rnd(-w, w);
+      if (players.length && Math.random() < 0.65) { const p = players[Math.floor(Math.random() * players.length)]; x = THREE.MathUtils.clamp(p.j.hipC.x + rnd(-3.2, 3.2), -w, w); }
       y = -5.6 - r;
     }
     const sp = (type === 'gold' ? 2.9 : type === 'big' ? 1.1 : rnd(1.3, 2.1)) * (1 + this.elapsed / 120);

@@ -14,7 +14,7 @@ export const MARKUP = `
   <div id="howto"></div>
   <div id="results"></div>
 </div>
-<div id="pip"><video id="pipv" playsinline muted></video></div>
+<div id="pip"><button id="b-rot" type="button" aria-label="Rotate camera picture">Rotate ⟳</button></div>
 <div id="wipe"></div>
 <div id="boot">
   <div class="boot-inner">

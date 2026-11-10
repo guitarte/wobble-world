@@ -34,7 +34,8 @@ export class ShapeUp {
     const floor = this.app.floorY; const open = new Uint8Array(COLS * ROWS); const holes = {}; const gems = [];
     for (const p of this.app.players) {
       const H = THREE.MathUtils.clamp(p.rig.standH || 3.5, 2, 6.5);
-      const cx = THREE.MathUtils.clamp(p.j.hipC.x + step * 0.55 * H, -8 + 0.7 * H * (poseId === 'star' ? 1 : 0.5), 8 - 0.7 * H * (poseId === 'star' ? 1 : 0.5));
+      const half = this.app.tracker.playHalf, pad = Math.min(half, 0.7 * H * (poseId === 'star' ? 1 : 0.5) * (half < 8 ? 0.4 : 1));
+      const cx = THREE.MathUtils.clamp(p.j.hipC.x + step * 0.55 * H, -half + pad, half - pad);
       holes[p.slot] = { cx, H, pose };
       for (const [x0, x1, y0, y1] of pose.rects) for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
         const x = -8 + (c + 0.5) * CELL, y = (r + 0.5) * CELL;
