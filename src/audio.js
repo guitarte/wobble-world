@@ -41,6 +41,48 @@ const TRACKS = {
     k: 'x.....x...x..x..', s: '....x.......x...', c: '....x.......x...', h: 'x.x.x.x.x.x.x.xx', bass: '0.....0...0..8..', bassType: '808', stab: '..x.......x.....',
     lead: [_, _, 12, _, 15, _, 12, 10, _, _, 7, _, 10, _, _, _, _, _, 12, _, 15, _, 17, 15, _, 12, _, 10, 12, _, _, _], leadType: 'bell', pad: false,
   },
+  // a five-note tune over taiko-style drums, for the paper garden
+  chop: {
+    bpm: 112, root: 62, chords: [[0, 7, 12], [-2, 5, 10], [-5, 2, 7], [-2, 5, 10]],
+    k: 'x..x..x.x..x....', s: '....x.......x.x.', h: '..x...x...x...x.', bass: '0..0..0.0..5....', arp: '0...2...1...2.3.',
+    lead: [0, _, 3, 5, 7, _, 10, 7, 5, _, 3, _, 0, _, _, _, 7, _, 10, 12, 10, _, 7, 5, 3, _, 5, 3, 0, _, _, _], leadType: 'bell', pad: true,
+  },
+  // light and breezy, for flying
+  sky: {
+    bpm: 122, root: 64, chords: [[0, 4, 7], [5, 9, 12], [-3, 0, 4], [-5, -1, 2]],
+    k: 'x.....x...x.....', s: '....x.......x...', h: 'x.x.x.x.x.x.x.x.', bass: '0...0..00...5...', arp: '0.1.2.4.2.1.3.2.',
+    lead: [7, _, _, 9, 11, _, 12, _, 11, _, 9, _, 7, _, 4, _, 9, _, _, 11, 12, _, 16, _, 14, _, 12, _, 11, 9, 7, _], leadType: 'bell', pad: true,
+  },
+  // chip-tune bounce for lasers and bricks
+  arcade: {
+    bpm: 136, root: 60, chords: [[0, 4, 7], [-3, 0, 4], [-7, -3, 0], [-5, -1, 2]],
+    k: 'x...x...x...x...', s: '....x.......x..x', h: '..x...x...x...x.', bass: '0.8.0.8.0.8.0.5.', arp: '0241024102410241',
+    lead: [12, _, 12, 16, 19, _, 16, _, 14, _, 12, _, 9, _, 12, _, 12, _, 12, 16, 19, _, 24, _, 21, 19, 16, _, 14, 12, _, _], leadType: 'square', pad: false,
+  },
+  // fast and driving, for the running track
+  race: {
+    bpm: 152, root: 57, chords: [[0, 4, 7], [5, 9, 12], [7, 11, 14], [5, 9, 12]],
+    k: 'x...x...x...x.x.', s: '....x.......x...', c: '....x.......x...', h: 'x.xxx.xxx.xxx.xx', bass: '0.0.0.0.0.0.5.8.', stab: 'x.....x.....x...',
+    lead: [12, _, 16, _, 19, _, 16, 19, 21, _, 19, _, 16, _, _, _, 14, _, 17, _, 21, _, 19, 17, 16, _, 14, _, 12, _, _, _], leadType: 'saw', pad: false,
+  },
+  // a wind-up toy waltzing about
+  toy: {
+    bpm: 108, root: 65, swing: 0.18, chords: [[0, 4, 7], [2, 5, 9], [-5, -1, 2], [0, 4, 7]],
+    k: 'x.....x.x.......', s: '....x.......x...', h: 'x.x.x.x.x.x.x.x.', bass: '0...5...0..05...', arp: '0.2.4.2.1.2.4.2.',
+    lead: [4, _, 7, _, 12, _, 11, 9, 7, _, 5, _, 4, _, _, _, 5, _, 9, _, 14, _, 12, 11, 12, _, 9, 7, 4, _, _, _], leadType: 'bell', pad: true,
+  },
+  // strutting funk for games that stop and start
+  funk: {
+    bpm: 112, root: 64, swing: 0.14, chords: [[0, 3, 7, 10], [5, 8, 12, 15], [0, 3, 7, 10], [-2, 2, 5, 8]],
+    k: 'x..x......x..x..', s: '....x.......x...', c: '....x.......x...', h: 'x.xxx.xxx.xxx.xx', bass: '0..0.8..0.0..5.8', stab: '..x..x....x..x..',
+    lead: [_, _, 12, _, 15, 12, _, 10, 12, _, _, _, 7, _, 10, _, _, _, 12, _, 15, 17, _, 15, 12, _, 10, _, 12, _, _, _], leadType: 'saw', pad: false,
+  },
+  // tiptoeing along, for careful balancing
+  sneak: {
+    bpm: 96, root: 62, swing: 0.2, chords: [[0, 3, 7], [-4, 0, 3], [-2, 2, 5], [-5, -1, 2]],
+    k: 'x.......x.....x.', s: '....x.......x...', h: '..x...x...x...x.', bass: '0..3..5.0..3..8.', arp: '0...1...2...1...',
+    lead: [0, _, 3, _, 7, _, 3, _, 2, _, 5, _, 7, _, _, _, 0, _, 3, _, 7, _, 10, _, 8, 7, 5, _, 3, _, 0, _], leadType: 'square', pad: false,
+  },
 };
 
 export class AudioEngine {

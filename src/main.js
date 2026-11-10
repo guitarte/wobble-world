@@ -25,10 +25,19 @@ import { JellyJam } from './games/jelly.js';
 import { ShapeUp } from './games/walls.js';
 import { CometKeeper } from './games/comet.js';
 import { DanceClass, DanceBattle, GENRES, demoPose, lessonOf, lessonsDone, lessonMoves, DEBUG as DANCE } from './games/dance.js';
+import { PaperChop } from './games/chop.js';
+import { BalloonBop } from './games/balloon.js';
+import { LaserLeap } from './games/laser.js';
+import { WingIt } from './games/wing.js';
+import { TurboTrot } from './games/trot.js';
+import { Mirror } from './mirror.js';
 
-// The game library, a page of five at a time.
+// The game library, a page of five at a time. The mirror page needs a real camera: it
+// shows the players themselves, in their own room, with the game drawn on top.
 const PAGES = [
-  { name: 'Games', games: [JellyJam, ShapeUp, CometKeeper, DanceClass, DanceBattle] },
+  { name: 'Action', games: [JellyJam, ShapeUp, CometKeeper, PaperChop, DanceClass] },
+  { name: 'Sports and party', games: [BalloonBop, WingIt, LaserLeap, TurboTrot, DanceBattle] },
+  { name: 'Mirror mode', camera: true, opts: { ar: true }, games: [BalloonBop, PaperChop, JellyJam] },
 ];
 const GAMES = [...new Set(PAGES.flatMap(p => p.games))];
 // The hero creator, one choice at a time.
@@ -63,6 +72,7 @@ class App {
     this.audio = new AudioEngine();
     this.hud = new HUD(this);
     this.heroes = new HeroBook(); this.page = 0;
+    this.mirror = new Mirror(this); this.ar = false; this.ws = 1;
     this.tracker = new Tracker(); this.sim = null;
     this.avatars = new Array(4).fill(null);
     this.scores = [0, 0, 0, 0]; this.seen = new Set();
@@ -126,8 +136,21 @@ class App {
     $('boot').classList.add('gone');
     try { navigator.wakeLock?.request('screen').catch(() => {}); } catch (e) { /* optional */ }
     const g = qs.get('game'); const G = g && GAMES.find(x => x.id === g);
-    if (G) this.startGame(G, { genre: qs.get('genre') || 'pop', lesson: qs.has('lesson') ? +qs.get('lesson') - 1 : undefined }); else this.enterMenu();
+    this.page = (+qs.get('page') || 1) - 1;
+    if (G) this.startGame(G, { genre: qs.get('genre') || 'pop', lesson: qs.has('lesson') ? +qs.get('lesson') - 1 : undefined, ar: qs.has('ar') }); else this.enterMenu();
   }
+  // Mirror mode on or off. In it, bodies stay where the camera sees them and the heroes step aside.
+  setAR(on) {
+    on = !!on && (this.tracker.mode === 'camera' || qs.has('ar')); if (this.ar === on) return; this.ar = on;
+    if (this.tracker.mode === 'camera') { this.tracker.setFit(!on); this.tracker.maxSide = on ? 1280 : 720; }
+    this.mirror.set(on); this.avatarRoot.visible = !on; this.env.hidden = on; this.rootEl.classList.toggle('ar', on);
+    this.bloom.strength = on ? 0.22 : 0.38; this.comic.uniforms.uSlip.value = on ? 0.35 : 1; this.comic.uniforms.uInk.value = on ? 0.7 : 1;
+    if (!on) this.ws = 1;
+  }
+  // Where the ground is, and how far to each side players can reach. Games size and place
+  // things with these (and with ws, the players' size against a hero's) so they work in mirror mode too.
+  get ground() { return this.floorY; }
+  get half() { return this.tracker.playHalf; }
 
   resize() {
     const w = this.rootEl.clientWidth || window.innerWidth, h = this.rootEl.clientHeight || window.innerHeight;
@@ -172,7 +195,7 @@ class App {
   // ------------------------------------------------------------ menu
   exitButton() { return { x: -7.2, y: 3.75, w: 1.1, h: 1.1, dwell: 1.6, cls: 'exit', quiet: true, html: ICONS.home, onSelect: () => this.toMenu() }; }
   enterMenu() {
-    this.cleanupGame(); this.phase = 'menu';
+    this.cleanupGame(); this.phase = 'menu'; this.setAR(false);
     if (this.make) { const { slot } = this.make; this.make = null; this.heroes.wear(slot, null); this.dress(slot); } // a hero left half-made is dropped
     this.hud.only = null;
     this.env.set('meadow'); this.audio.playMusic('menu'); this.audio.duck(false);
@@ -181,12 +204,14 @@ class App {
   }
   sideButton(x, html, colors, onSelect, o = {}) { return { x, y: 0.3, w: 2.1, h: 1.5, cls: 'side mini', colors, html, onSelect, ...o }; }
   showMenu() {
-    const pages = PAGES.filter(pg => !pg.camera || this.tracker.mode === 'camera'), pg = pages[this.page % pages.length], n = pg.games.length;
-    $('menu-note').textContent = pages.length > 1 ? `${pg.name}: hold a hand on a game to play!` : 'Hold a hand on a game to play!';
+    const pages = PAGES.filter(pg => !pg.camera || this.tracker.mode === 'camera' || qs.has('ar')), pg = pages[this.page % pages.length], n = pg.games.length;
+    this.page %= pages.length;
+    $('menu-note').textContent = pg.camera ? 'Mirror mode: see yourself in the game!' : `${pg.name} (${this.page + 1} of ${pages.length}): hold a hand on a game to play!`;
     const cards = pg.games.map((G, i) => {
       const best = this.best(G.id);
       return { x: (i - (n - 1) / 2) * 3.08, y: 2.5, w: 2.84, h: 2.3, colors: G.colors, html: `${ICONS[G.icon]}<h3>${G.title}</h3><p>${G.blurb}</p>${best ? `<span class="bestv">Best ${best.toLocaleString()}</span>` : ''}`, onSelect: () => (G.dance ? this.enterGenre(G) : this.startGame(G, pg.opts)) };
     });
+    if (pg.camera) for (const c of cards) c.html += `<span class="cam">${ICONS.mirror}</span>`;
     cards.push(this.sideButton(-6.85, `${ICONS.hero}<h3>Heroes</h3>`, ['#ff8a3d', '#d6306f'], () => this.enterHeroes()));
     if (pages.length > 1) cards.push(this.sideButton(6.85, `${ICONS.more}<h3>More games</h3>`, ['#8f6bff', '#5a35d6'], () => { this.page = (this.page + 1) % pages.length; this.showMenu(); }, { repeat: true }));
     this.hud.setButtons(cards);
@@ -286,13 +311,13 @@ class App {
   startGame(G, opts = {}) {
     if (this.busy) return; this.busy = true; this.lastGame = [G, opts];
     this.hud.wipe(G.colors[0], () => {
-      this.cleanupGame();
+      this.cleanupGame(); this.setAR(opts.ar && G.ar);
       const genre = G.dance ? GENRES[opts.genre || 'pop'] : null;
       this.env.set(G.theme, genre?.accent); this.audio.playMusic(genre ? genre.music : G.music); this.audio.duck(false);
       this.scores = [0, 0, 0, 0]; this.seen = new Set();
       this.game = new G(this, opts);
       this.hud.showTop(G.title); for (const p of this.players) this.hud.setScore(p.slot, 0);
-      this.hud.howto(G, this.game.label || genre?.name); this.hud.setButtons([this.exitButton()]);
+      this.hud.howto(G, this.game.label || genre?.name || (this.ar ? 'Mirror mode' : '')); this.hud.setButtons([this.exitButton()]);
       this.phase = 'intro'; this.phaseT = qs.has('fast') ? 0.3 : 4.2;
     }).then(() => { this.busy = false; });
   }
@@ -324,9 +349,9 @@ class App {
     this.aimPointer(); this.sim?.update(now, dt, t);
     this.tracker.update(now, dt);
     const players = this.players;
-    let fy = 0;
+    let fy = 0, size = 0;
     for (const p of players) {
-      fy += p.rig.floorY; this.seen.add(p.slot);
+      fy += p.rig.floorY; size += p.rig.S; this.seen.add(p.slot);
       const a = this.avatars[p.slot]; if (!a) continue;
       a.update(p.rig, dt, t, this.game?.lookTarget?.(p) || null);
       for (let h = 0; h < 2; h++) this.fx.swoosh(p.slot * 2 + h, p.rig.hands[h], p.color, p.rig.handVel[h].length(), p.rig.S, dt);
@@ -335,6 +360,8 @@ class App {
     if (this.demo) this.updateDemo(dt, t);
     if (players.length) this.floorY += (THREE.MathUtils.clamp(fy / players.length, -4.4, -1.5) - this.floorY) * Math.min(1, dt * 2);
     this.env.update(dt, t, this.floorY, this.audio.ready ? this.audio.beat : t * 2);
+    if (this.ar && players.length) this.ws += (THREE.MathUtils.clamp(size / players.length / 1.28, 0.4, 1.4) - this.ws) * Math.min(1, dt * 3);
+    this.mirror.update(dt, t, players);
 
     this.tracker.autoRotate = this.phase === 'menu' && !this.manualRot && !qs.has('rot');
     // the little camera preview takes the shape of the picture, wide or tall

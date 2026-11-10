@@ -1,6 +1,7 @@
 // Worlds: one animated 3D backdrop per game, with a shared sky and lighting rig.
 import * as THREE from 'three';
 import { EXTRAS } from './env-extras.js';
+import { MORE } from './env-more.js';
 import { sceneToon, inkGroup, TOON } from './toon.js';
 
 const C = (h) => new THREE.Color(h);
@@ -30,6 +31,8 @@ const THEMES = {
   space: { top: 0x01020c, mid: 0x100a33, bot: 0x35186a, fog: 0x0a0624, far: 200, stars: 1.6, hemi: [0xa9b8ff, 0x24104a, 0.60], sun: [0xcfe0ff, 1.24], exposure: 1.0 },
   stage: { top: 0x05020c, mid: 0x180735, bot: 0x3a0f5e, fog: 0x12052a, far: 110, stars: 0.25, hemi: [0xd0b8ff, 0x2a1050, 0.65], sun: [0xffffff, 1.05], exposure: 1.0 },
 };
+
+for (const k in MORE) THEMES[k] = MORE[k].theme;
 
 export class Environment {
   constructor(scene) {
@@ -63,8 +66,8 @@ export class Environment {
     if (accent !== undefined) this.accent.set(accent);
     if (this.name === name) return;
     this.name = name; this.target = THEMES[name];
-    if (!this.groups[name]) { const g = new THREE.Group(); this.groups[name] = g; this.scene.add(g); const a = this['build_' + name](g) || (() => {}), b = EXTRAS[name] ? EXTRAS[name](g, this) : null; this.updaters[name] = b ? (dt, t) => { a(dt, t); b(dt, t); } : a; inkGroup(g); }
-    for (const k in this.groups) this.groups[k].visible = k === name;
+    if (!this.groups[name]) { const g = new THREE.Group(); this.groups[name] = g; this.scene.add(g); const a = (this['build_' + name] ? this['build_' + name](g) : MORE[name].build(g, this)) || (() => {}), b = EXTRAS[name] ? EXTRAS[name](g, this) : null; this.updaters[name] = b ? (dt, t) => { a(dt, t); b(dt, t); } : a; inkGroup(g); }
+    for (const k in this.groups) this.groups[k].visible = k === name && !this.hidden;
     // snap colours on change (the screen wipe hides it)
     const T = this.target; this.u.uTop.value.set(T.top); this.u.uMid.value.set(T.mid); this.u.uBot.value.set(T.bot); this.u.uStars.value = T.stars;
     this.scene.fog.color.set(T.fog); this.scene.fog.far = T.far; this.scene.fog.near = T.far * 0.3;
@@ -76,6 +79,7 @@ export class Environment {
     this.u.uTime.value = t;
     this.floorY += (floorY - this.floorY) * Math.min(1, dt * 2);
     const g = this.groups[this.name]; if (!g) return;
+    g.visible = !this.hidden; if (this.hidden) return; // mirror mode shows the real room instead
     g.position.y = this.floorY;
     this.beat = beat; this.beatPulse = Math.pow(1 - (beat % 1), 3);
     this.updaters[this.name](dt, t);

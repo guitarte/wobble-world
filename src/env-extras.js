@@ -33,7 +33,7 @@ export const EXTRAS = {
       dummy.position.set(x, h / 2, z); dummy.scale.set(1, h, 1); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); stems.setMatrixAt(i, dummy.matrix);
       dummy.position.set(x, h, z); dummy.scale.set(0.16, 0.1, 0.16); dummy.updateMatrix(); petals.setMatrixAt(i, dummy.matrix); petals.setColorAt(i, col.set(cols[i % 5]));
     }
-    g.add(petals, stems);
+    petals.name = stems.name = 'flowers'; g.add(petals, stems); // named so a game that lays a track across the meadow can clear them away
     // rainbow
     const rb = [0xff5a78, 0xff9248, 0xffd84a, 0x4dffa6, 0x4fd8ff, 0x9d6bff];
     rb.forEach((c, i) => { const m = new THREE.Mesh(new THREE.TorusGeometry(60 - i * 1.6, 0.8, 6, 80, Math.PI), basic(c, { transparent: true, opacity: 0.5, fog: false })); m.position.set(18, -4, -150); g.add(m); });

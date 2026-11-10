@@ -23,6 +23,9 @@ html, body { margin: 0; height: 100%; background: var(--ink); overflow: hidden; 
 #status:empty { display: none; }
 .bossbar { display: inline-flex; align-items: center; gap: .4em; } .bossbar b { font-family: 'Bangers', sans-serif; font-weight: 400; letter-spacing: .04em; color: #e3b8ff; }
 .bossbar i { display: inline-block; width: calc(var(--u) * 3); height: .62em; background: var(--ink); border: calc(var(--u) * 0.04) solid var(--ink); box-shadow: calc(var(--u) * 0.04) calc(var(--u) * 0.04) 0 var(--ink); transform: skewX(-12deg); } .bossbar u { display: block; height: 100%; background: linear-gradient(90deg, var(--pink), var(--sun)); transition: width .12s steps(2); text-decoration: none; }
+#status .race { position: relative; display: inline-block; width: calc(var(--u) * 4.2); height: .4em; margin: .45em .5em .2em; background: var(--ink); border-radius: 1em; box-shadow: 0 0 0 calc(var(--u) * 0.03) #fff; }
+#status .race::after { content: ''; position: absolute; right: -.5em; top: -.5em; width: .32em; height: 1.4em; background: repeating-linear-gradient(#fff 0 .2em, var(--ink) .2em .4em); border: calc(var(--u) * 0.03) solid var(--ink); }
+#status .race i { position: absolute; top: 50%; width: .82em; height: .82em; margin: -.41em; border-radius: 50%; border: calc(var(--u) * 0.04) solid var(--ink); transition: left .2s linear; z-index: 1; }
 #status .heart { color: var(--pink); } #status .heart.off { color: rgba(255, 255, 255, .35); }
 #timer { position: relative; isolation: isolate; width: 2.3em; height: 2.3em; color: var(--ink); font-size: calc(var(--u) * 0.56); display: grid; place-items: center; font-variant-numeric: tabular-nums; padding-top: .06em; }
 #timer::before, #timer::after { content: ''; position: absolute; z-index: -1; clip-path: var(--burst); }
@@ -56,6 +59,7 @@ html, body { margin: 0; height: 100%; background: var(--ink); overflow: hidden; 
 @keyframes wiggle { from { transform: rotate(-9deg) scale(1.05); } to { transform: rotate(9deg) scale(1.15); } }
 .btn h3 { margin: .1em 0 0; font-size: calc(var(--u) * 0.47); line-height: .95; text-shadow: var(--ol), .08em .1em 0 var(--ink); white-space: nowrap; }
 .btn p { margin: .3em .5em 0; font-size: calc(var(--u) * 0.185); font-weight: 600; color: var(--ink); background: var(--paper); border: calc(var(--u) * 0.03) solid var(--ink); padding: .16em .55em; text-align: center; line-height: 1.12; transform: rotate(-1.2deg); }
+.btn .cam { position: absolute; left: 3%; top: 4%; width: 17%; line-height: 0; transform: rotate(-6deg); } .btn .cam svg { width: 100%; max-height: none; }
 .btn .bestv { position: absolute; right: 3%; top: 4%; font-size: calc(var(--u) * 0.16); background: var(--sun); color: var(--ink); border: calc(var(--u) * 0.028) solid var(--ink); padding: .1em .5em; font-weight: 700; transform: rotate(5deg); }
 .btn.lesson h3 { font-size: calc(var(--u) * 0.5); } .btn.lesson em { font-style: normal; font-weight: 700; font-size: calc(var(--u) * 0.2); color: var(--ink); background: var(--sun); border: calc(var(--u) * 0.03) solid var(--ink); padding: .05em .6em; margin-top: .25em; transform: rotate(1.5deg); }
 .btn.lesson p { font-size: calc(var(--u) * 0.2); line-height: 1.22; padding: .3em .9em; margin-top: .45em; }

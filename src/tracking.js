@@ -193,11 +193,20 @@ export class Tracker {
     this.onJoin = null; this.onLeave = null; this.mirror = true;
     this.canvas = document.createElement('canvas'); this.ctx = this.canvas.getContext('2d', { alpha: false });
     this.rotation = 0; this.autoRotate = false; this.sideTurn = 0; this.sideSince = 0;
-    this.fit = true; this.cands = [];
+    this.fit = true; this.cands = []; this.maxSide = 720; this.frameN = 0;
     try { this.rotation = (+localStorage.getItem('ww-rot') || 0) % 360; } catch (e) { /* fine */ }
   }
 
   get active() { return this.players.filter(Boolean); }
+  // Fitted: everyone is scaled to hero size and stood on the stage floor. Not fitted: bodies
+  // stay exactly where the camera sees them, for the mirror mode that shows the real picture.
+  setFit(on) {
+    if (this.fit === on) return; this.fit = on;
+    for (const p of this.active) {
+      p.first = true; p.filters = Array.from({ length: 33 }, () => [new OneEuro(), new OneEuro()]); p.fit = { T: 0, floor: null, stand: null, dropT: 0, off: 0, s: 1, k: 0 };
+      const r = p.rig; r.size = r.ground = undefined; r.fresh = true; r.baseHipY = null; r.standH = 0;
+    }
+  }
   // half-width of the area players can actually reach, and how much to stretch menu cursors to cover the screen
   // A tall, narrow picture only covers the middle of the stage, so sideways steps are
   // stretched until walking across the picture is walking across the stage.
@@ -243,7 +252,7 @@ export class Tracker {
   update(now, dt) {
     if (this.mode === 'camera' && this.video && this.video.readyState >= 2 && this.video.currentTime !== this.lastVideoTime) {
       this.lastVideoTime = this.video.currentTime;
-      const frame = this.drawFrame();
+      const frame = this.drawFrame(); this.frameN++;
       const aspect = frame.width / Math.max(1, frame.height);
       // fill the 16-wide stage; a squarer camera gets its top and bottom cropped a little
       // A tall, narrow picture shows the whole body in the middle of the stage instead.
@@ -269,7 +278,7 @@ export class Tracker {
   // Copy the camera frame to a canvas, turned so people stand upright. Some
   // phones and stands deliver the picture sideways.
   drawFrame() {
-    const v = this.video, vw = v.videoWidth, vh = v.videoHeight, k = Math.min(1, 720 / Math.max(vw, vh));
+    const v = this.video, vw = v.videoWidth, vh = v.videoHeight, k = Math.min(1, this.maxSide / Math.max(vw, vh));
     const side = this.rotation % 180 !== 0, cw = Math.round((side ? vh : vw) * k), ch = Math.round((side ? vw : vh) * k);
     const c = this.canvas; if (c.width !== cw || c.height !== ch) { c.width = cw; c.height = ch; }
     const g = this.ctx; g.setTransform(1, 0, 0, 1, 0, 0); g.translate(cw / 2, ch / 2); g.rotate(this.rotation * Math.PI / 180); g.drawImage(v, -vw * k / 2, -vh * k / 2, vw * k, vh * k);

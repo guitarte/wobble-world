@@ -66,7 +66,7 @@ const POPS = ['POP!', 'BLOOP!', 'SPLISH!', 'PLOP!'];
 
 export class JellyJam {
   static id = 'jelly'; static title = 'Jelly Jam'; static blurb = 'Pop the jellies, dodge the spiky ones'; static icon = 'jelly';
-  static colors = ['#25d6c8', '#0c69ad']; static theme = 'reef'; static music = 'jelly'; static stars = [1500, 3500, 6000];
+  static colors = ['#25d6c8', '#0c69ad']; static theme = 'reef'; static music = 'jelly'; static stars = [1500, 3500, 6000]; static ar = true;
   static howto = ['Pop jellies with your hands, feet or head', 'Keep popping to build a combo', 'Stay away from the spiky urchins', 'Punch King Jelly when he shows up!'];
 
   constructor(app) {
@@ -78,14 +78,14 @@ export class JellyJam {
   spawn(type, x, y, small) {
     const urchin = type === 'urchin';
     const mesh = urchin ? makeUrchin() : makeJelly(type); this.app.root.add(mesh);
-    const r = small ? 0.42 : type === 'king' ? 1.75 : type === 'big' ? 1.2 : type === 'gold' ? 0.52 : urchin ? 0.7 : rnd(0.6, 0.78);
+    const k = this.app.ws, r = (small ? 0.42 : type === 'king' ? 1.75 : type === 'big' ? 1.2 : type === 'gold' ? 0.52 : urchin ? 0.7 : rnd(0.6, 0.78)) * k; // in mirror mode everything is sized to the players
     const players = this.app.players;
     if (x === undefined) {
       const w = this.app.tracker.playHalf - 0.6; x = rnd(-w, w);
-      if (players.length && Math.random() < 0.65) { const p = players[Math.floor(Math.random() * players.length)]; x = THREE.MathUtils.clamp(p.j.hipC.x + rnd(-3.2, 3.2), -w, w); }
+      if (players.length && Math.random() < 0.65) { const p = players[Math.floor(Math.random() * players.length)]; x = THREE.MathUtils.clamp(p.j.hipC.x + rnd(-3.2, 3.2) * k, -w, w); }
       y = -5.6 - r;
     }
-    const sp = (type === 'gold' ? 2.9 : type === 'big' ? 1.1 : rnd(1.3, 2.1)) * (1 + this.elapsed / 120);
+    const sp = (type === 'gold' ? 2.9 : type === 'big' ? 1.1 : rnd(1.3, 2.1)) * (1 + this.elapsed / 120) * (0.5 + 0.5 * k);
     const it = { mesh, type, x, y, r, vy: sp, vx: small ? rnd(-2, 2) : 0, ph: rnd(0, 6), hp: type === 'big' ? 3 : 1, cool: 0, age: 0, dead: 0, hue: rnd(0, 1), squash: 0 };
     mesh.position.set(x, y, 0); mesh.scale.setScalar(0.01); this.items.push(it); return it;
   }

@@ -21,6 +21,16 @@ export const ICONS = {
   ok: `<svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="46" fill="#fff"/><path d="M36 62l16 16 32-36" stroke="#12a877" stroke-width="13" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   make: `<svg viewBox="0 0 120 120"><path d="M26 94l8-30 44-44 22 22-44 44z" fill="#fff"/><path d="M26 94l8-30 22 22z" fill="#ffd84a"/><path d="M92 62l4 11 11 4-11 4-4 11-4-11-11-4 11-4zM24 14l3 9 9 3-9 3-3 9-3-9-9-3 9-3z" fill="#ffd84a"/></svg>`,
   mirror: `<svg viewBox="0 0 120 120"><rect x="12" y="30" width="96" height="66" rx="12" fill="#fff"/><path d="M40 30l8-14h24l8 14z" fill="#fff"/><circle cx="60" cy="63" r="22" fill="#2a1a3a"/><circle cx="60" cy="63" r="12" fill="#4fd8ff"/><circle cx="54" cy="57" r="4" fill="#fff"/></svg>`,
+  chop: `<svg viewBox="0 0 120 120"><path d="M14 66l52-34 40 6-34 28z" fill="#fff"/><path d="M66 32l6 34H14z" fill="#ffe1ea"/><path d="M72 66l-10 34-20-34z" fill="#ff9ab4"/><path d="M20 106L104 14" stroke="#2a1a3a" stroke-width="13" stroke-linecap="round"/><path d="M20 106L104 14" stroke="#ffd84a" stroke-width="6" stroke-linecap="round"/></svg>`,
+  balloon: `<svg viewBox="0 0 120 120"><ellipse cx="60" cy="46" rx="34" ry="38" fill="#ff5a78"/><path d="M52 82h16l-4 10h-8z" fill="#ff5a78"/><path d="M60 92q-12 10 0 18" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round"/><ellipse cx="44" cy="28" rx="7" ry="12" fill="#fff" opacity=".7" transform="rotate(24 44 28)"/><circle cx="50" cy="50" r="4.5" fill="#2a1a3a"/><circle cx="72" cy="50" r="4.5" fill="#2a1a3a"/><path d="M52 62q9 8 18 0" stroke="#2a1a3a" stroke-width="4" fill="none" stroke-linecap="round"/></svg>`,
+  wing: `<svg viewBox="0 0 120 120"><circle cx="80" cy="40" r="28" fill="none" stroke="#ffd84a" stroke-width="9"/><path d="M6 80l96-42-40 64-10-24z" fill="#fff"/><path d="M52 78l50-40-40 64z" fill="#bfe0ff"/></svg>`,
+  laser: `<svg viewBox="0 0 120 120"><rect x="6" y="66" width="18" height="30" rx="5" fill="#fff"/><rect x="96" y="66" width="18" height="30" rx="5" fill="#fff"/><path d="M24 81h72" stroke="#23e6ff" stroke-width="11" stroke-linecap="round"/><path d="M24 81h72" stroke="#fff" stroke-width="3"/><circle cx="60" cy="18" r="10" fill="#fff"/><path d="M60 30v18M60 36l-16-8M60 36l16-8M60 48l-13 12M60 48l13 12" stroke="#fff" stroke-width="8" stroke-linecap="round" fill="none"/></svg>`,
+  trot: `<svg viewBox="0 0 120 120"><path d="M30 42l18 4 16 24 34 8q14 3 14 16H24z" fill="#fff"/><path d="M22 94h92v9H22z" fill="#ffd84a"/><path d="M58 60l9-6M66 71l9-6" stroke="#ff5a78" stroke-width="5" stroke-linecap="round"/><path d="M4 54h18M2 70h16M6 86h12" stroke="#fff" stroke-width="6" stroke-linecap="round"/></svg>`,
+  freeze: `<svg viewBox="0 0 120 120"><circle cx="58" cy="64" r="46" fill="#fff"/><circle cx="58" cy="64" r="32" fill="#2a1a3a"/><rect x="43" y="48" width="11" height="32" rx="3" fill="#4fd8ff"/><rect x="62" y="48" width="11" height="32" rx="3" fill="#4fd8ff"/><path d="M100 6l4 11 11 4-11 4-4 11-4-11-11-4 11-4z" fill="#ffd84a"/></svg>`,
+  dot: `<svg viewBox="0 0 120 120"><path d="M14 16h92a8 8 0 0 1 8 8v50a8 8 0 0 1-8 8H60l-24 24V82H14a8 8 0 0 1-8-8V24a8 8 0 0 1 8-8z" fill="#fff"/><circle cx="42" cy="44" r="7" fill="#2a1a3a"/><circle cx="78" cy="44" r="7" fill="#2a1a3a"/><path d="M44 58q16 13 32 0" stroke="#2a1a3a" stroke-width="6" fill="none" stroke-linecap="round"/></svg>`,
+  bowl: `<svg viewBox="0 0 120 120"><path d="M78 10q9 0 9 11t-5 15q11 13 9 36t-13 32H66q-11-9-13-32t9-36q-5-4-5-15t9-11z" fill="#fff"/><path d="M60 37h34" stroke="#ff5a78" stroke-width="6"/><circle cx="36" cy="80" r="28" fill="#4fd8ff"/><circle cx="27" cy="70" r="4.5" fill="#2a1a3a"/><circle cx="41" cy="68" r="4.5" fill="#2a1a3a"/><circle cx="36" cy="82" r="4.5" fill="#2a1a3a"/></svg>`,
+  pow: `<svg viewBox="0 0 120 120"><rect x="8" y="10" width="48" height="22" rx="5" fill="#ff5a78"/><rect x="64" y="10" width="48" height="22" rx="5" fill="#ffd84a"/><rect x="6" y="38" width="28" height="22" rx="5" fill="#22d3c5"/><rect x="86" y="38" width="28" height="22" rx="5" fill="#b18cff"/><path d="M60 36l6 13 14-3-8 12 9 11-15-1-6 14-6-14-15 1 9-11-8-12 14 3z" fill="#fff"/><circle cx="60" cy="100" r="13" fill="#fff"/></svg>`,
+  topple: `<svg viewBox="0 0 120 120"><rect x="34" y="86" width="52" height="24" rx="5" fill="#22d3c5"/><rect x="26" y="60" width="48" height="24" rx="5" fill="#ffd84a" transform="rotate(-5 50 72)"/><rect x="44" y="34" width="46" height="24" rx="5" fill="#ff5a78" transform="rotate(7 67 46)"/><rect x="36" y="8" width="40" height="24" rx="5" fill="#fff" transform="rotate(-10 56 20)"/><path d="M102 30q8 9 0 19M16 38q-8 9 0 19" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round"/></svg>`,
   home: `<svg viewBox="0 0 120 120"><path d="M16 60l44-40 44 40" stroke="#fff" stroke-width="12" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M30 58v42h24V76h12v24h24V58" fill="#fff"/></svg>`,
 };
 
@@ -120,7 +130,11 @@ export class HUD {
     });
     for (const c of this.cursors) { if (!c.dataset.live) c.classList.remove('on'); delete c.dataset.live; }
     // nothing sits above a menu button, so a hand stretched higher than its top edge still counts
-    const m = 0.15, on = (p, h, b) => { const dy = p.rig.cursorY(h) - b.y; return Math.abs(cx(p, h) - b.x) < b.w / 2 + m && dy > -b.h / 2 - m && (dy < b.h / 2 + m || !b.quiet); };
+    // The quiet home button also wants one calm hand: two hands in the air, or a hand flying past, is somebody playing.
+    const m = 0.15, on = (p, h, b) => {
+      if (b.quiet && (p.rig.hands[1 - h].y > p.j.chest.y || p.rig.handVel[h].length() > 2.5 * p.rig.S)) return false;
+      const dy = p.rig.cursorY(h) - b.y; return Math.abs(cx(p, h) - b.x) < b.w / 2 + m && dy > -b.h / 2 - m && (dy < b.h / 2 + m || !b.quiet);
+    };
     const pointed = new Set();
     for (const p of players) {
       const mine = [0, 1].map(h => this.buttons.find(b => !b.fired && on(p, h, b)));
