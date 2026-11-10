@@ -1,9 +1,11 @@
 // Worlds: one animated 3D backdrop per game, with a shared sky and lighting rig.
 import * as THREE from 'three';
+import { EXTRAS } from './env-extras.js';
+import { sceneToon, inkGroup, TOON } from './toon.js';
 
 const C = (h) => new THREE.Color(h);
 const rnd = (a, b) => a + Math.random() * (b - a);
-const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.8, ...o });
+const std = sceneToon;
 const basic = (color, o = {}) => new THREE.MeshBasicMaterial({ color, ...o });
 const add = (color, opacity = 1) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
 const sph = new THREE.SphereGeometry(1, 24, 16);
@@ -13,10 +15,17 @@ function glowTex() {
   g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c);
 }
 let GLOW = null; const glow = () => (GLOW = GLOW || glowTex());
+// a comic bubble: an ink ring with a white shine
+function bubbleTex() {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  g.fillStyle = 'rgba(190,245,255,.55)'; g.beginPath(); g.arc(32, 32, 24, 0, 7); g.fill(); g.lineWidth = 7; g.strokeStyle = '#140c2a'; g.stroke();
+  g.strokeStyle = '#fff'; g.lineWidth = 5; g.lineCap = 'round'; g.beginPath(); g.arc(32, 32, 15, 3.5, 4.6); g.stroke();
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
 
 const THEMES = {
   meadow: { top: 0x1f7dff, mid: 0x62bcff, bot: 0xc9ecff, fog: 0xa9dcff, far: 260, stars: 0, hemi: [0xdff1ff, 0x86c96a, 0.45], sun: [0xfff0d0, 1.05], exposure: 1.0 },
-  reef: { top: 0x04205f, mid: 0x0c69ad, bot: 0x22cfc4, fog: 0x0d73a8, far: 75, stars: 0, hemi: [0x9fe8ff, 0x1a6a8a, 0.80], sun: [0xcffcff, 1.12], exposure: 1.05 },
+  reef: { top: 0x04205f, mid: 0x0c69ad, bot: 0x22cfc4, fog: 0x0d73a8, far: 75, stars: 0, hemi: [0x9fe8ff, 0x1a6a8a, 0.5], sun: [0xcffcff, 0.72], exposure: 1.05 },
   neon: { top: 0x04010d, mid: 0x2a0a52, bot: 0xff4a9e, fog: 0x1b0638, far: 130, stars: 1, hemi: [0xb48cff, 0x27124a, 0.60], sun: [0xff9ad5, 0.99], exposure: 1.0 },
   space: { top: 0x01020c, mid: 0x100a33, bot: 0x35186a, fog: 0x0a0624, far: 200, stars: 1.6, hemi: [0xa9b8ff, 0x24104a, 0.60], sun: [0xcfe0ff, 1.24], exposure: 1.0 },
   stage: { top: 0x05020c, mid: 0x180735, bot: 0x3a0f5e, fog: 0x12052a, far: 110, stars: 0.25, hemi: [0xd0b8ff, 0x2a1050, 0.65], sun: [0xffffff, 1.05], exposure: 1.0 },
@@ -25,16 +34,20 @@ const THEMES = {
 export class Environment {
   constructor(scene) {
     this.scene = scene; this.name = null; this.groups = {}; this.updaters = {}; this.floorY = -3.7; this.accent = C(0xff4fa3); this.beatPulse = 0;
-    this.u = { uTop: { value: C(0x2f8fff) }, uMid: { value: C(0x8fd3ff) }, uBot: { value: C(0xfff1cf) }, uStars: { value: 0 }, uTime: { value: 0 } };
+    this.u = { uTop: { value: C(0x2f8fff) }, uMid: { value: C(0x8fd3ff) }, uBot: { value: C(0xfff1cf) }, uStars: { value: 0 }, uTime: { value: 0 }, uDot: TOON.uDot };
     this.sky = new THREE.Mesh(new THREE.SphereGeometry(400, 32, 20), new THREE.ShaderMaterial({
       side: THREE.BackSide, depthWrite: false, fog: false, uniforms: this.u,
       vertexShader: `varying vec3 vD; void main(){ vD=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
-      fragmentShader: `varying vec3 vD; uniform vec3 uTop,uMid,uBot; uniform float uStars,uTime;
+      fragmentShader: `varying vec3 vD; uniform vec3 uTop,uMid,uBot; uniform float uStars,uTime,uDot;
         float h(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+        // one colour gives way to the next through a field of growing dots, like printed screentone
+        float tone(float k, float size){ vec2 p=mat2(0.7071,-0.7071,0.7071,0.7071)*gl_FragCoord.xy/(uDot*size); float d=length(fract(p)-0.5); float r=clamp(k,0.0,1.0)*0.74; return 1.0-smoothstep(r-0.04,r+0.04,d); }
         void main(){ vec3 d=normalize(vD); float y=d.y;
-          vec3 c=mix(uBot,uMid,smoothstep(-0.12,0.1,y)); c=mix(c,uTop,smoothstep(0.08,0.5,y));
+          vec3 c=mix(uMid,uBot,tone(1.0-smoothstep(-0.08,0.2,y),2.6));
+          c=mix(c,uTop,1.0-tone(1.0-smoothstep(0.12,0.62,y),3.4));
           vec2 g=vec2(atan(d.x,-d.z)*60.0, y*90.0); vec2 id=floor(g); vec2 f=fract(g)-0.5; float r=h(id);
-          float s=step(0.93,r)*smoothstep(0.22,0.0,length(f))*(0.5+0.5*sin(uTime*(1.0+r*3.0)+r*40.0));
+          float tw=0.5+0.5*sin(uTime*(1.0+r*3.0)+r*40.0);
+          float s=step(0.93,r)*max(smoothstep(0.2,0.05,length(f)), smoothstep(0.03,0.0,min(abs(f.x),abs(f.y)))*smoothstep(0.45,0.1,length(f))*step(0.975,r))*tw;
           c+=vec3(s)*uStars*smoothstep(-0.05,0.25,y);
           gl_FragColor=vec4(c,1.0); }`,
     }));
@@ -50,7 +63,7 @@ export class Environment {
     if (accent !== undefined) this.accent.set(accent);
     if (this.name === name) return;
     this.name = name; this.target = THEMES[name];
-    if (!this.groups[name]) { const g = new THREE.Group(); this.groups[name] = g; this.scene.add(g); this.updaters[name] = this['build_' + name](g) || (() => {}); }
+    if (!this.groups[name]) { const g = new THREE.Group(); this.groups[name] = g; this.scene.add(g); const a = this['build_' + name](g) || (() => {}), b = EXTRAS[name] ? EXTRAS[name](g, this) : null; this.updaters[name] = b ? (dt, t) => { a(dt, t); b(dt, t); } : a; inkGroup(g); }
     for (const k in this.groups) this.groups[k].visible = k === name;
     // snap colours on change (the screen wipe hides it)
     const T = this.target; this.u.uTop.value.set(T.top); this.u.uMid.value.set(T.mid); this.u.uBot.value.set(T.bot); this.u.uStars.value = T.stars;
@@ -90,7 +103,7 @@ export class Environment {
     }
     const balloons = [], bc = [0xff5a78, 0x22d3c5, 0xffc531, 0x9d6bff, 0xff9248];
     for (let i = 0; i < 10; i++) {
-      const b = new THREE.Group(); const m = new THREE.Mesh(sph, new THREE.MeshPhysicalMaterial({ color: bc[i % 5], roughness: 0.25, clearcoat: 1 })); m.scale.set(0.9, 1.1, 0.9); b.add(m);
+      const b = new THREE.Group(); const m = new THREE.Mesh(sph, std(bc[i % 5])); m.scale.set(0.9, 1.1, 0.9); b.add(m);
       const s = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 2.4), basic(0xffffff)); s.position.y = -2.2; b.add(s);
       b.position.set(rnd(-22, 22), rnd(6, 14), rnd(-30, -8)); b.userData = { y: b.position.y, p: rnd(0, 6) }; g.add(b); balloons.push(b);
     }
@@ -124,7 +137,7 @@ export class Environment {
     for (let i = 0; i < 7; i++) { const s = new THREE.Mesh(new THREE.PlaneGeometry(rnd(3, 6), 60), add(0x9ff5ff, 0.07)); s.position.set((i - 3) * 9, 18, rnd(-30, -12)); s.rotation.z = 0.3; s.material.fog = false; g.add(s); shafts.push(s); }
     const N = 160, pos = new Float32Array(N * 3); for (let i = 0; i < N; i++) { pos[i * 3] = rnd(-30, 30); pos[i * 3 + 1] = rnd(0, 26); pos[i * 3 + 2] = rnd(-35, 2); }
     const bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const bub = new THREE.Points(bg, new THREE.PointsMaterial({ color: 0xcffaff, size: 0.34, map: glow(), transparent: true, opacity: 0.75, depthWrite: false })); g.add(bub);
+    const bub = new THREE.Points(bg, new THREE.PointsMaterial({ color: 0xffffff, size: 0.5, map: bubbleTex(), transparent: true, alphaTest: 0.4, depthWrite: false })); g.add(bub);
     const fish = [];
     for (let i = 0; i < 14; i++) {
       const f = new THREE.Group(); const m = std(cc[(i + 1) % 5], { roughness: 0.4 });
@@ -191,10 +204,10 @@ export class Environment {
     const bands = ['#ffb36b', '#ff8f6b', '#ffd59a', '#f7a15c', '#ffe2b8', '#e97f5f', '#ffc98a'];
     for (let y = 0; y < 128; y++) { px.fillStyle = bands[Math.floor((y / 128) * 14 + Math.sin(y * 0.3) * 0.8) % bands.length] || bands[0]; px.fillRect(0, y, 8, 1); }
     const ptex = new THREE.CanvasTexture(pc); ptex.colorSpace = THREE.SRGBColorSpace;
-    const planet = new THREE.Mesh(new THREE.SphereGeometry(20, 48, 32), new THREE.MeshStandardMaterial({ map: ptex, roughness: 0.9, fog: false })); planet.position.set(-34, 26, -120); planet.rotation.z = 0.35; g.add(planet);
+    const planet = new THREE.Mesh(new THREE.SphereGeometry(20, 48, 32), std(0xffffff, { map: ptex, fog: false })); planet.position.set(-34, 26, -120); planet.rotation.z = 0.35; g.add(planet);
     const ring = new THREE.Mesh(new THREE.RingGeometry(26, 38, 96), new THREE.MeshBasicMaterial({ color: 0xffe2b8, transparent: true, opacity: 0.55, side: THREE.DoubleSide, fog: false })); ring.rotation.x = Math.PI / 2 - 0.25; planet.add(ring);
-    const moon = new THREE.Mesh(sph, new THREE.MeshStandardMaterial({ color: 0x9fd0ff, roughness: 1, fog: false })); moon.scale.setScalar(5); moon.position.set(42, 34, -130); g.add(moon);
-    const rock = new THREE.IcosahedronGeometry(1, 0), rocks = new THREE.InstancedMesh(rock, new THREE.MeshStandardMaterial({ color: 0x8a7fb5, roughness: 0.9, flatShading: true }), 40);
+    const moon = new THREE.Mesh(sph, std(0x9fd0ff, { fog: false })); moon.scale.setScalar(5); moon.position.set(42, 34, -130); g.add(moon);
+    const rock = new THREE.IcosahedronGeometry(1, 0), rocks = new THREE.InstancedMesh(rock, std(0x8a7fb5), 40);
     const rd = []; const d = new THREE.Object3D();
     for (let i = 0; i < 40; i++) rd.push({ x: rnd(-60, 60), y: rnd(2, 40), z: rnd(-110, -25), s: rnd(0.5, 2.6), r: rnd(0, 6), v: rnd(0.2, 1) });
     g.add(rocks);
@@ -228,7 +241,7 @@ export class Environment {
       const geo = new THREE.ConeGeometry(4.5, 34, 24, 1, true); geo.translate(0, -17, 0);
       const s = new THREE.Mesh(geo, add(0xffffff, 0.09)); s.position.set((i - 2.5) * 9, 30, -18 - (i % 2) * 8); s.userData.p = i * 1.3; g.add(s); spots.push(s);
     }
-    const ball = new THREE.Mesh(new THREE.IcosahedronGeometry(2.2, 2), new THREE.MeshStandardMaterial({ color: 0x9a9ab8, metalness: 1, roughness: 0.18, flatShading: true })); ball.position.set(0, 11.2, -12); g.add(ball);
+    const ball = new THREE.Mesh(new THREE.IcosahedronGeometry(2.2, 2), std(0xd8d8ff)); ball.position.set(0, 11.2, -12); g.add(ball);
     const N = 220, pos = new Float32Array(N * 3), seed = []; for (let i = 0; i < N; i++) seed.push([rnd(0, 6.28), rnd(-1, 1), rnd(10, 34), rnd(0.2, 0.7)]);
     const dg = new THREE.BufferGeometry(); dg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     const dots = new THREE.Points(dg, new THREE.PointsMaterial({ color: 0xffffff, size: 0.6, map: glow(), transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false })); g.add(dots);

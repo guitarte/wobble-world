@@ -4,9 +4,9 @@ import * as THREE from 'three';
 
 export const STAGE_H = 9;
 export const MAX_PLAYERS = 4;
-export const PLAYER_COLORS = [0xff5a78, 0x22d3c5, 0xffc531, 0x9d6bff];
-export const PLAYER_CSS = ['#ff5a78', '#22d3c5', '#ffc531', '#9d6bff'];
-export const PLAYER_NAMES = ['Pip', 'Mint', 'Sunny', 'Plum'];
+export const PLAYER_COLORS = [0xff4d6d, 0x19c9c0, 0xffc21a, 0x9a5bff];
+export const PLAYER_CSS = ['#ff4d6d', '#19c9c0', '#ffc21a', '#9a5bff'];
+export const PLAYER_NAMES = ['Ember', 'Zeph', 'Volt', 'Nova'];
 
 // MediaPipe landmark indices
 export const L = {
@@ -105,6 +105,12 @@ export class Rig {
     e = e * idt / (10 * S);
     this.energy += (Math.min(e, 4) - this.energy) * Math.min(1, dt * 5);
   }
+
+  // Where a hand points for menu buttons. Buttons sit along the top of the screen, so
+  // smaller players get extra upward reach: everyone can get there by raising a hand.
+  get reachUp() { return THREE.MathUtils.clamp((3.3 - this.j.chest.y) / (1.05 * this.S), 1, 3.6); }
+  cursorY(h) { const y = this.hands[h].y, sh = this.j.chest.y; return y <= sh ? y : Math.min(4.3, sh + (y - sh) * this.reachUp); }
+  uncursorY(y) { const sh = this.j.chest.y; return y <= sh ? y : sh + (y - sh) / this.reachUp; }
 
   // Unit direction of a limb segment, used by the dance games to compare poses.
   dir(a, b, out = v3()) { return out.subVectors(this.j[b], this.j[a]).normalize(); }

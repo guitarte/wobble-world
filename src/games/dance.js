@@ -3,11 +3,12 @@
 //   Dance Battle: freestyle turns in the spotlight, judged on energy, rhythm and style.
 // Music comes in three original styles: pop, K-pop and hip hop.
 import * as THREE from 'three';
+import { sceneToon, inkGroup } from '../toon.js';
 import { Rig, PLAYER_CSS, PLAYER_NAMES } from '../tracking.js';
 import { buildSkeleton } from '../sim.js';
 import { Avatar } from '../avatar.js';
 
-const D = Math.PI / 180, RISE = 2.6;
+const D = Math.PI / 180, RISE = 1.9;
 const clamp = THREE.MathUtils.clamp, lerp = THREE.MathUtils.lerp;
 const P = (aL, aR, o = {}) => ({ a: [aL, aR], c: 0, l: 0, s: 0, legs: [{ dx: 0, lift: 0 }, { dx: 0, lift: 0 }], ...o });
 const DOWN = [18, 12], HIP = [50, -100];
@@ -44,6 +45,9 @@ function poseAt(move, beat) {
   const n = move.keys.length, k = ((Math.floor(beat) % n) + n) % n, f = beat - Math.floor(beat);
   const u = clamp((f - 0.5) / 0.5, 0, 1); return mix(move.keys[k], move.keys[(k + 1) % n], u * u * (3 - 2 * u));
 }
+// Poses for the heroes dancing on the title screen.
+const DEMO = ['sunshine', 'wave', 'roof', 'heart'];
+export const demoPose = (i, beat) => poseAt(MOVES[DEMO[(i + Math.floor(beat / 8)) % 4]], beat);
 const tA = new THREE.Vector3(), tB = new THREE.Vector3();
 // 0..1: how closely a player's arms and crouch match a pose (compared as seen on screen, like a mirror)
 function matchPose(rig, pose) {
@@ -55,20 +59,31 @@ function matchPose(rig, pose) {
   }
   return (s / 2) * 0.82 + (1 - Math.min(1, Math.abs(rig.crouch - pose.c) * 1.4)) * 0.18;
 }
+// A little drawing of a pose, for the move strip at the side of the screen.
+function picto(pose) {
+  const S = buildSkeleton({ x: 0, floor: 0, h: 1, crouch: pose.c, lean: pose.l * D, sway: pose.s, arms: pose.a, legs: pose.legs });
+  const pt = (i) => `${(S[i][0] * 100).toFixed(1)} ${(-S[i][1] * 100).toFixed(1)}`;
+  const limbs = `M${pt(15)}L${pt(13)}L${pt(11)}M${pt(16)}L${pt(14)}L${pt(12)}M${pt(27)}L${pt(25)}L${pt(23)}M${pt(28)}L${pt(26)}L${pt(24)}`, body = `M${pt(11)}L${pt(12)}L${pt(24)}L${pt(23)}Z`;
+  const hx = (S[0][0] * 100).toFixed(1), hy = (-S[0][1] * 100 - 3).toFixed(1);
+  return `<svg viewBox="-64 -132 128 140"><g stroke-linecap="round" stroke-linejoin="round"><path d="${limbs}" fill="none" stroke="#140c2a" stroke-width="19"/><path d="${body}" fill="#140c2a" stroke="#140c2a" stroke-width="19"/><circle cx="${hx}" cy="${hy}" r="15" fill="#140c2a"/><path d="${limbs}" fill="none" stroke="#fff" stroke-width="10"/><path d="${body}" fill="#fff" stroke="#fff" stroke-width="10"/><circle cx="${hx}" cy="${hy}" r="10.5" fill="#fff"/></g></svg>`;
+}
 const intentFor = (pose, extra = {}) => ({ arms: pose.a, crouch: pose.c, lean: pose.l * D, sway: pose.s, legs: pose.legs, snap: 20, followPointer: false, ...extra });
 
 class Coach {
   constructor(app, accent) {
     this.app = app; this.rig = new Rig(); this.holder = new THREE.Group(); this.holder.position.z = -4.5; app.root.add(this.holder);
-    this.avatar = new Avatar(accent, 4); this.holder.add(this.avatar.group); this.h = 5.0; this.x = 0; this.P = null;
-    const riser = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 3.1, RISE, 40), new THREE.MeshStandardMaterial({ color: 0x241046, roughness: 0.4, emissive: accent, emissiveIntensity: 0.25 }));
-    this.riser = riser; this.holder.add(riser);
+    this.avatar = new Avatar(accent, 4); this.holder.add(this.avatar.group); this.h = 4.8; this.x = 0; this.P = null;
+    const riser = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 3.1, RISE, 40), sceneToon(0x3a1c6e, { emissive: accent, emissiveIntensity: 0.25 }));
+    this.riser = riser; this.holder.add(riser); inkGroup(riser);
     this.rim = new THREE.Mesh(new THREE.TorusGeometry(2.62, 0.07, 8, 60), new THREE.MeshBasicMaterial({ color: accent })); this.rim.rotation.x = Math.PI / 2; this.holder.add(this.rim);
   }
   update(pose, dt, t) {
     const floor = this.app.floorY; this.riser.position.y = floor + RISE / 2; this.rim.position.y = floor + RISE + 0.02;
-    this.P = buildSkeleton({ x: this.x, floor: floor + RISE, h: this.h, crouch: pose.c, lean: pose.l * D, sway: pose.s, arms: pose.a, legs: pose.legs }, this.P);
-    for (let i = 0; i < 33; i++) { const p = this.rig.pts[i]; p.x = this.P[i][0]; p.y = this.P[i][1]; p.v = 1; }
+    const step = Math.floor(t * 12); // the coach is animated "on twos", like a comic in motion
+    if (step !== this.step || !this.P) {
+      this.step = step; this.P = buildSkeleton({ x: this.x, floor: floor + RISE, h: this.h, crouch: pose.c, lean: pose.l * D, sway: pose.s, arms: pose.a, legs: pose.legs }, this.P);
+      for (let i = 0; i < 33; i++) { const p = this.rig.pts[i]; p.x = this.P[i][0]; p.y = this.P[i][1]; p.v = 1; }
+    }
     this.rig.solve(dt); this.avatar.update(this.rig, dt, t, null);
     this.rim.scale.setScalar(1 + this.app.env.beatPulse * 0.06);
   }
@@ -109,9 +124,11 @@ export class DanceClass extends DanceBase {
       this.seg = seg;
       if (seg.mode === 'watch') { hud.banner(seg.move.name, '#fff', 1.6, 'Watch the coach'); audio.ding(); }
       else if (seg.mode === 'dance') { hud.banner('Your turn!', '#ffd23f', 1.1); audio.go(); }
-      else if (seg === this.segs.find(s => s.mode === 'remix')) { hud.banner('The whole routine!', '#ffd23f', 1.5); audio.cheer(1.2); }
+      else if (seg === this.segs.find(s => s.mode === 'remix')) { hud.banner('The whole routine!', '#ffd23f', 1.5); audio.cheer(1.2); audio.hype(true); fx.speedLines(); }
       hud.setStatus(seg.mode === 'remix' ? `Routine: ${seg.move.name}` : `Move ${seg.i + 1} of 4: ${seg.move.name}`);
+      hud.side(`<h4>${seg.move.name}</h4>` + seg.move.keys.map((k, i) => `<div class="pic"><b>${i + 1}</b>${picto(k)}</div>`).join(''), this.genre.colors[0]);
     }
+    hud.sideActive(Math.floor(local) % 4);
     this.pose = poseAt(seg.move, local); this.coach.update(this.pose, dt, t);
     hud.setTimer(Math.ceil((this.total - beat) / (audio.bpm / 60)));
     if (seg.mode === 'watch') return;
@@ -122,7 +139,8 @@ export class DanceClass extends DanceBase {
       this.lastBeat = bi;
       for (const p of players) {
         const s = p.slot, m = this.best[s]; this.best[s] = 0; const at = { x: p.j.head.x, y: p.j.head.y + 1.3 };
-        if (m >= 0.78) { this.streak[s]++; this.app.addScore(s, 100, at, { text: 'Perfect!', color: '#ffd23f', cls: 'big', sub: this.streak[s] >= 3 ? this.streak[s] + ' streak' : '', cheer: 0.9 }); fx.ring(p.j.chest, 0xffd23f, 2.6, 0.4); fx.burst(p.j.haL, { count: 10, color: 0xffd23f, speed: 5 }); fx.burst(p.j.haR, { count: 10, color: 0xffd23f, speed: 5 }); if (s === players[0].slot) audio.perfect(); }
+        if (m >= 0.78) { this.streak[s]++; this.app.addScore(s, 100, at, { text: 'Perfect!', color: '#ffd23f', cls: 'big', sub: this.streak[s] >= 3 ? this.streak[s] + ' streak' : '', cheer: 0.9 }); fx.ring(p.j.chest, 0xffd23f, 2.6, 0.4); fx.pow(p.j.haL, 0xffd23f, 0.7); fx.pow(p.j.haR, 0xffd23f, 0.7); fx.burst(p.j.haL, { count: 8, color: 0xffd23f, speed: 5 }); fx.burst(p.j.haR, { count: 8, color: 0xffd23f, speed: 5 });
+          if (this.streak[s] % 5 === 0) { fx.word({ x: p.j.head.x, y: p.j.head.y + 2.1 }, this.streak[s] >= 10 ? 'ON FIRE!' : 'SO SMOOTH!', '#fff', p.css); audio.cheer(0.6); } if (s === players[0].slot) audio.perfect(); }
         else if (m >= 0.58) { this.streak[s]++; this.app.addScore(s, 60, at, { text: 'Great!', color: '#7fe3ff', sub: this.streak[s] >= 3 ? this.streak[s] + ' streak' : '' }); if (s === players[0].slot) audio.good(); }
         else if (m >= 0.4) { this.streak[s] = 0; this.app.addScore(s, 30, at, { text: 'Good', color: '#fff', cls: 'small', sub: '' }); }
         else { this.streak[s] = 0; fx.popup(at, 'Keep going', 'rgba(255,255,255,.7)', 'small'); this.app.hud.setScore(s, this.app.scores[s], ''); }
@@ -178,13 +196,18 @@ export class DanceBattle extends DanceBase {
     const { hud, audio } = this.app; this.turnIdx = i; const tn = this.turns[i]; this.turnScore = 0; this.tags = new Set(); this.promptDone = false; this.eAcc = 0; this.nearMax = 0; this.midE = 0;
     if (tn.who === 'cpu') { hud.banner('DJ Dot\'s turn', '#ff8fd0', 1.4, 'Watch and get ready'); this.cpuTarget = Math.max(260, this.lastPlayerTurn * (0.78 + Math.random() * 0.3)); }
     else { hud.banner(`${PLAYER_NAMES[tn.who]}'s turn!`, PLAYER_CSS[tn.who], 1.6, 'Challenge: ' + tn.prompt.say); }
-    hud.setStatus(tn.who === 'cpu' ? 'DJ Dot is dancing' : 'Challenge: ' + tn.prompt.say); audio.ding(tn.who === 'cpu' ? 76 : 84);
+    hud.setStatus(tn.who === 'cpu' ? 'DJ Dot is dancing' : 'Challenge: ' + tn.prompt.say); audio.ding(tn.who === 'cpu' ? 76 : 84); this.styleCard(tn.who);
   }
   endTurn() {
     const tn = this.turns[this.turnIdx]; if (!tn) return; const { fx, audio } = this.app;
     if (tn.who === 'cpu') { fx.popup({ x: 0, y: 3.2 }, `DJ Dot: ${Math.round(this.rival).toLocaleString()}`, '#ff8fd0', 'big'); }
     else { this.lastPlayerTurn = this.turnScore; const p = this.app.players.find(q => q.slot === tn.who); if (p) { fx.popup({ x: p.j.head.x, y: p.j.head.y + 2 }, `${Math.round(this.turnScore)} points!`, p.css, 'big'); fx.confetti(p.j.chest, 40); } }
     audio.cheer(1.3);
+  }
+  // the list of style moves to collect during a turn
+  styleCard(who) {
+    const hud = this.app.hud; if (who === 'cpu' || who === undefined) { hud.side(''); return; }
+    hud.side('<h4>Style moves</h4>' + TAGS.map(([n]) => `<div class="tagrow ${this.tags.has(who + n) ? 'on' : ''}">${n}</div>`).join(''), PLAYER_CSS[who]);
   }
   give(p, pts, text, cls = 'small', color) { this.turnScore += pts; this.app.addScore(p.slot, pts, { x: p.j.head.x + (Math.random() - 0.5) * 1.5, y: p.j.head.y + 1.2 + Math.random() * 0.6 }, { text, cls, color }); }
 
@@ -206,11 +229,11 @@ export class DanceBattle extends DanceBase {
       return;
     }
     if (beat >= this.total) {
-      this.phase = 'freeze'; this.moved = new Set(); this.spot.material.opacity = 0; hud.banner('FREEZE!', '#9fe8ff', 2.6, 'Hold your pose'); hud.setStatus('Freeze!'); audio.scratch(); audio.freeze(); audio.setMuffle(true); return;
+      this.phase = 'freeze'; this.moved = new Set(); this.spot.material.opacity = 0; hud.banner('FREEZE!', '#9fe8ff', 2.6, 'Hold your pose'); fx.speedLines(); hud.side(''); hud.setStatus('Freeze!'); audio.scratch(); audio.freeze(); audio.setMuffle(true); return;
     }
     const ti = Math.floor(beat / TURN);
     if (ti < this.turns.length) { if (ti !== this.turnIdx) { if (this.turnIdx >= 0) this.endTurn(); this.beginTurn(ti, players); } }
-    else if (this.phase !== 'finale') { this.endTurn(); this.phase = 'finale'; this.turnIdx = -1; this.tags = new Set(); this.promptDone = true; hud.banner('Everybody dance!', '#ffd23f', 1.6, 'Double points'); hud.setStatus('Finale! Double points'); audio.cheer(1.6); }
+    else if (this.phase !== 'finale') { this.endTurn(); this.phase = 'finale'; this.turnIdx = -1; this.tags = new Set(); this.promptDone = true; hud.banner('Everybody dance!', '#ffd23f', 1.6, 'Double points'); hud.setStatus('Finale! Double points'); audio.cheer(1.6); audio.hype(true); hud.side(''); fx.speedLines(); }
     hud.setTimer(Math.ceil((this.total - beat) / (audio.bpm / 60)));
 
     const tn = this.turns[this.turnIdx]; const act = this.active(players); const mult = this.phase === 'finale' ? 2 : 1;
@@ -225,9 +248,9 @@ export class DanceBattle extends DanceBase {
     for (const p of act) {
       const r = p.rig, s = p.slot; p._e = (p._e || 0) + Math.min(r.energy, 2.4) * 48 * mult * dt;
       if (f < 0.2 || f > 0.82) p._near = Math.max(p._near || 0, r.energy); else if (f > 0.4 && f < 0.6) p._mid = r.energy;
-      if (r.energy > 0.5 && Math.random() < dt * 14) fx.trail(r.hands[Math.random() < 0.5 ? 0 : 1], p.color, 0.3);
-      if (this.phase !== 'finale' && !this.promptDone && tn.prompt.test(r)) { this.promptDone = true; this.give(p, 150, 'Challenge! +150', 'big', '#ffd23f'); audio.gold(); fx.confetti(p.j.chest, 30); this.app.avatars[s]?.cheer(1); }
-      for (const [name, test] of TAGS) { const key = s + name; if (!this.tags.has(key) && test(r)) { this.tags.add(key); this.give(p, 50 * mult, `${name}! +${50 * mult}`, '', '#7fe3ff'); audio.ding(86); } }
+      if (r.energy > 0.5 && Math.random() < dt * 10) fx.burst(r.hands[Math.random() < 0.5 ? 0 : 1], { count: 1, color: p.color, speed: 2, size: 0.2, gravity: -1 });
+      if (this.phase !== 'finale' && !this.promptDone && tn.prompt.test(r)) { this.promptDone = true; this.give(p, 150, '+150', 'big', '#ffd23f'); fx.word({ x: p.j.head.x, y: p.j.head.y + 2 }, 'NAILED IT!', '#ffd23f', p.css); audio.gold(); fx.confetti(p.j.chest, 30); this.app.avatars[s]?.cheer(1); }
+      for (const [name, test] of TAGS) { const key = s + name; if (!this.tags.has(key) && test(r)) { this.tags.add(key); this.give(p, 50 * mult, `${name}! +${50 * mult}`, '', '#7fe3ff'); audio.ding(86); fx.pow(r.hands[0], 0x7fe3ff, 0.7); if (this.phase !== 'finale') this.styleCard(s); } }
       if (onBeat) {
         const e = Math.round(p._e || 0); p._e = 0; if (e > 4) this.give(p, e, '+' + e);
         if ((p._near || 0) > 0.7 && (p._near || 0) > (p._mid || 0) * 1.15) { this.give(p, 40 * mult, 'On the beat!', '', '#ffd23f'); fx.ring({ x: p.j.hipC.x, y: floor + 0.2 }, p.color, 2.4, 0.35); }

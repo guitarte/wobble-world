@@ -92,7 +92,7 @@ export class AudioEngine {
   playMusic(name) {
     if (!this.ctx) { this.pending = name; return; }
     if (this.trackName === name && this.track) return;
-    this.trackName = name; this.track = TRACKS[name]; this.step = 0;
+    this.trackName = name; this.track = TRACKS[name]; this.step = 0; this.hypeOn = false;
     this.nextTime = this.ctx.currentTime + 0.08; this.startTime = this.nextTime;
     this.delay.delayTime.value = 60 / this.track.bpm * 0.75;
     this.music.gain.cancelScheduledValues(this.now); this.music.gain.setTargetAtTime(0.5, this.now, 0.05);
@@ -115,34 +115,61 @@ export class AudioEngine {
       this.step++; this.nextTime += sd;
     }
   }
+  // Each tune is arranged over 16 bars so it keeps moving: a groove to start,
+  // the melody, a breakdown that builds with a drum roll, then a full chorus.
+  // Games can also call hype(true) to jump to the chorus for a finale.
   playStep(T, t, s, bar, sd) {
     const m = this.music, ch = T.chords[bar % T.chords.length], root = T.root, hit = (p) => p && p[s % p.length] === 'x';
-    const fill = bar % 4 === 3 && s >= 12;
-    if (hit(T.k)) { this.osc('sine', 150, t, 0.22, 0.95, m, { to: 42, toTime: 0.12 }); this.noiseHit(t, 0.02, 0.2, 'lowpass', 1200, m); }
-    if (hit(T.s) || (fill && s % 2 === 0 && T.bpm > 100)) { this.noiseHit(t, 0.16, 0.42, 'bandpass', 1900, m, 0.8); this.osc('triangle', 210, t, 0.09, 0.3, m, { to: 140 }); }
-    if (hit(T.c)) { for (const o of [0, 0.011, 0.023]) this.noiseHit(t + o, 0.09, 0.2, 'bandpass', 1300, m, 1.4).connect(this.rev); }
-    if (hit(T.h)) this.noiseHit(t, 0.035, s % 4 === 2 ? 0.16 : 0.09, 'highpass', 7500, m);
-    const b = T.bass && T.bass[s];
-    if (b && b !== '.') {
+    const b16 = bar % 16, sec = this.hypeOn ? 3 : b16 >> 2, q = bar % 4;
+    const breakdown = sec === 2 && q < 2, build = sec === 2 && q === 3, chorus = sec === 3;
+    const fill = q === 3 && s >= 12 && !build;
+    if (s === 0 && q === 0 && bar > 0 && (chorus || sec === 1)) this.crash(t);
+    if (build && s === 0) this.riser(t, sd * 16);
+    // drums
+    const kick = breakdown ? s === 0 : build ? (s < 12 && s % 4 === 0) : (hit(T.k) || (chorus && T.bpm >= 110 && s % 4 === 0));
+    if (kick) { this.osc('sine', 150, t, 0.22, 0.95, m, { to: 42, toTime: 0.12 }); this.noiseHit(t, 0.02, 0.2, 'lowpass', 1200, m); }
+    const roll = build && (s < 8 ? s % 2 === 0 : true);
+    if (roll || (!breakdown && (hit(T.s) || (fill && s % 2 === 0 && T.bpm > 100)))) { const v = roll ? 0.12 + 0.3 * (s / 16) : 0.42; this.noiseHit(t, 0.16, v, 'bandpass', 1900, m, 0.8); this.osc('triangle', 210, t, 0.09, v * 0.7, m, { to: 140 }); }
+    if (fill && T.bpm <= 100) this.osc('sine', mtof(57 - (s - 12) * 3), t, 0.2, 0.5, m, { to: mtof(46 - (s - 12) * 3), toTime: 0.16 });
+    if (!breakdown && !build && (hit(T.c) || (chorus && hit(T.s)))) { for (const o of [0, 0.011, 0.023]) this.noiseHit(t + o, 0.09, 0.2, 'bandpass', 1300, m, 1.4).connect(this.rev); }
+    if (hit(T.h) && !build) this.noiseHit(t, 0.035, s % 4 === 2 ? 0.16 : 0.09, 'highpass', 7500, m);
+    if (chorus && s % 4 === 2) this.noiseHit(t, 0.13, 0.1, 'highpass', 6200, m);
+    if (chorus && s % 2 === 1) this.noiseHit(t, 0.025, 0.045, 'highpass', 9000, m);
+    // bass
+    const b = T.bass && T.bass[s], bassOn = !breakdown && !(build && s >= 12);
+    if (bassOn && b && b !== '.') {
       const n = root + ch[0] - 24 + (b === '5' ? 7 : b === '8' ? 12 : 0);
       if (T.bassType === '808') this.osc('sine', mtof(n + 12) * 1.3, t, 0.55, 0.8, m, { to: mtof(n + 12), toTime: 0.06 });
       else { this.osc('sawtooth', mtof(n + 12), t, sd * 1.8, 0.3, m, { lp: 900, lpTo: 180, q: 4 }); this.osc('sine', mtof(n), t, sd * 1.8, 0.4, m); }
-    }
+    } else if (bassOn && chorus && T.bassType !== '808' && s % 4 === 2) this.osc('sawtooth', mtof(root + ch[0]), t, sd * 1.4, 0.2, m, { lp: 1100, lpTo: 220, q: 4 });
+    // harmony
     const a = T.arp && T.arp[s];
-    if (a && a !== '.') { const i = +a, n = root + ch[i % 3] + 12 * Math.floor(i / 3) + 12; this.osc('triangle', mtof(n), t, 0.16, 0.13, m, { delay: true }); this.osc('square', mtof(n), t, 0.1, 0.03, m, { lp: 2400 }); }
-    if (hit(T.stab)) for (const c of ch) { this.osc('sawtooth', mtof(root + c + 12), t, 0.16, 0.07, m, { lp: 3200, lpTo: 600, detune: 8, rev: true }); this.osc('sawtooth', mtof(root + c + 12), t, 0.16, 0.07, m, { lp: 3200, lpTo: 600, detune: -8 }); }
-    if (T.pad && s === 0) for (const c of ch) this.osc('sawtooth', mtof(root + c), t, sd * 15, 0.035, m, { attack: 0.25, lp: 1100, detune: (c % 2 ? 7 : -7), rev: true });
-    if (T.lead && s % 2 === 0) {
+    if (a && a !== '.') {
+      const i = +a, n = root + ch[i % 3] + 12 * Math.floor(i / 3) + 12; this.osc('triangle', mtof(n), t, 0.16, 0.13, m, { delay: true }); this.osc('square', mtof(n), t, 0.1, 0.03, m, { lp: 2400 });
+      if (chorus) this.osc('triangle', mtof(n + 12), t + sd, 0.12, 0.06, m, { delay: true });
+    }
+    if ((hit(T.stab) && !breakdown) || (chorus && !T.stab && s % 8 === 6)) for (const c of ch) { this.osc('sawtooth', mtof(root + c + 12), t, 0.16, 0.07, m, { lp: 3200, lpTo: 600, detune: 8, rev: true }); this.osc('sawtooth', mtof(root + c + 12), t, 0.16, 0.07, m, { lp: 3200, lpTo: 600, detune: -8 }); }
+    if ((T.pad || breakdown) && s === 0) for (const c of ch) this.osc('sawtooth', mtof(root + c), t, sd * 15, breakdown ? 0.05 : 0.035, m, { attack: 0.25, lp: breakdown ? 1700 : 1100, detune: (c % 2 ? 7 : -7), rev: true });
+    // melody: sits out the first two bars, and is doubled an octave up in the chorus
+    if (T.lead && s % 2 === 0 && !(sec === 0 && q < 2) && !build) {
       const n = T.lead[((bar % 4) * 8 + s / 2) % T.lead.length];
-      if (n !== null && n !== undefined) this.leadNote(T.leadType, root + n + (T.leadType === 'bell' ? 12 : 0), t, sd * 2.4);
+      if (n !== null && n !== undefined) {
+        const base = root + n + (T.leadType === 'bell' ? 12 : 0);
+        this.leadNote(T.leadType, base, t, sd * 2.4, breakdown ? 0.7 : 1);
+        if (chorus) this.leadNote('bell', base + (T.leadType === 'bell' ? 12 : 24), t, sd * 2, 0.45);
+      }
     }
   }
-  leadNote(type, n, t, dur) {
+  leadNote(type, n, t, dur, v = 1) {
     const f = mtof(n), m = this.music;
-    if (type === 'bell') { this.osc('sine', f, t, dur * 1.6, 0.17, m, { rev: true, delay: true }); this.osc('sine', f * 3.01, t, 0.12, 0.05, m); this.osc('triangle', f * 2, t, dur, 0.04, m); }
-    else if (type === 'saw') { this.osc('sawtooth', f, t, dur, 0.09, m, { lp: 3800, lpTo: 900, q: 3, detune: 9, delay: true }); this.osc('sawtooth', f, t, dur, 0.09, m, { lp: 3800, lpTo: 900, q: 3, detune: -9, rev: true }); }
-    else { this.osc('square', f, t, dur, 0.07, m, { lp: 2600, delay: true, rev: true }); }
+    if (type === 'bell') { this.osc('sine', f, t, dur * 1.6, 0.17 * v, m, { rev: true, delay: true }); this.osc('sine', f * 3.01, t, 0.12, 0.05 * v, m); this.osc('triangle', f * 2, t, dur, 0.04 * v, m); }
+    else if (type === 'saw') { this.osc('sawtooth', f, t, dur, 0.09 * v, m, { lp: 3800, lpTo: 900, q: 3, detune: 9, delay: true }); this.osc('sawtooth', f, t, dur, 0.09 * v, m, { lp: 3800, lpTo: 900, q: 3, detune: -9, rev: true }); }
+    else { this.osc('square', f, t, dur, 0.07 * v, m, { lp: 2600, delay: true, rev: true }); }
   }
+  crash(t) { this.noiseHit(t, 1.3, 0.26, 'highpass', 4200, this.music, 0.5).connect(this.rev); this.noiseHit(t, 0.25, 0.16, 'bandpass', 900, this.music, 0.6); }
+  riser(t, dur) { const g = this.noiseHit(t, dur, 0.001, 'bandpass', 500, this.music, 2.5, 7000); g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.2, t + dur * 0.97); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.04); }
+  // Jump the music to its chorus for a finale (and back).
+  hype(on) { if (this.hypeOn === on) return; this.hypeOn = on; if (on && this.ctx && this.track) this.crash(this.now + 0.02); }
 
   // --- sound effects
   tone(type, n, dur, vol, o = {}) { if (this.ctx) this.osc(type, mtof(n), this.now + (o.at || 0), dur, vol, this.sfx, o); }

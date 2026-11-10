@@ -80,7 +80,7 @@ const lerp = (a, b, k) => a + (b - a) * k;
 class Bot {
   constructor(i, n) {
     this.i = i;
-    this.h = [3.9, 3.3, 4.2, 3.0][i];
+    this.h = [4.2, 3.6, 4.4, 3.2][i];
     this.home = n === 1 ? 0 : (i - (n - 1) / 2) * (11 / Math.max(1, n - 1)) * (n === 2 ? 0.5 : 1);
     this.x = this.home; this.floor = -3.7; this.crouch = 0; this.lean = 0; this.jump = 0; this.vy = 0;
     this.arms = [[...REST_ARM], [...REST_ARM]];

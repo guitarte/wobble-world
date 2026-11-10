@@ -23,13 +23,14 @@ export class HUD {
     this.app = app; this.buttons = []; this.chips = {}; this.cursors = [];
     this.scoresEl = $('scores'); this.bannerEl = $('banner'); this.countEl = $('count'); this.btnEl = $('buttons');
     this.curEl = $('cursors'); this.hintEl = $('hint'); this.titleEl = $('gtitle'); this.timerEl = $('timer'); this.statusEl = $('status');
-    this.howEl = $('howto'); this.resEl = $('results'); this.wipeEl = $('wipe'); this.topEl = $('top');
+    this.sideEl = $('strip'); this.howEl = $('howto'); this.resEl = $('results'); this.wipeEl = $('wipe'); this.topEl = $('top');
     for (let i = 0; i < 8; i++) { const c = el('div', 'cursor'); c.style.setProperty('--pc', PLAYER_CSS[i >> 1]); this.curEl.appendChild(c); this.cursors.push(c); }
+    this.tags = PLAYER_NAMES.map((n, i) => { const t = el('div', 'nametag', n); t.style.setProperty('--pc', PLAYER_CSS[i]); $('tags').appendChild(t); return t; });
   }
 
   // ----- top bar
   showTop(title) { this.topEl.classList.add('on'); this.titleEl.textContent = title; this.timerEl.textContent = ''; this.statusEl.innerHTML = ''; }
-  hideTop() { this.topEl.classList.remove('on'); this.scoresEl.innerHTML = ''; this.chips = {}; }
+  hideTop() { this.topEl.classList.remove('on'); this.scoresEl.innerHTML = ''; this.chips = {}; this.side(''); }
   setTimer(sec) { const s = Math.max(0, Math.ceil(sec)); const txt = s; if (this.timerEl.textContent !== String(txt)) { this.timerEl.textContent = txt; this.timerEl.classList.toggle('low', s <= 10); } }
   setStatus(html) { if (this.statusEl.innerHTML !== html) this.statusEl.innerHTML = html; }
   setScore(slot, score, sub) {
@@ -42,6 +43,10 @@ export class HUD {
     if (sub !== undefined) c.querySelector('em').textContent = sub;
   }
   removeScore(slot) { this.chips[slot]?.remove(); delete this.chips[slot]; }
+
+  // ----- a strip down the left edge: move pictures in the dance games
+  side(html, color) { if (this.sideHtml !== html) { this.sideHtml = html; this.sideEl.innerHTML = html; this.sideOn = -1; } if (color) this.sideEl.style.setProperty('--ac', color); this.sideEl.classList.toggle('on', !!html); }
+  sideActive(i) { if (this.sideOn === i) return; this.sideOn = i; this.sideEl.querySelectorAll('.pic').forEach((e, k) => e.classList.toggle('on', k === i)); }
 
   // ----- big moments
   banner(text, color = '#fff', dur = 1.3, sub = '') {
@@ -80,13 +85,20 @@ export class HUD {
     const gain = this.app.tracker.reachGain, cx = (x) => Math.max(-7.8, Math.min(7.8, x * gain));
     for (const p of players) for (let h = 0; h < 2; h++) {
       const c = this.cursors[p.slot * 2 + h], pos = p.rig.hands[h];
-      c.style.transform = `translate(calc(${cx(pos.x)} * var(--u)), calc(${-pos.y} * var(--u)))`; c.classList.toggle('on', show); c.dataset.live = '1'; n++;
+      c.style.transform = `translate(calc(${cx(pos.x)} * var(--u)), calc(${-p.rig.cursorY(h)} * var(--u)))`; c.classList.toggle('on', show); c.dataset.live = '1'; n++;
     }
+    // name tags float over each hero's head while choosing
+    const tagsOn = this.app.phase === 'menu' || this.app.phase === 'genre';
+    this.tags.forEach((t, i) => {
+      const p = players.find(q => q.slot === i); t.classList.toggle('on', !!p && tagsOn); if (!p) return;
+      const y = Math.max(-4.12, p.rig.floorY - 0.32);
+      t.style.transform = `translate(-50%, -50%) translate(calc(${cx(p.rig.j.hipC.x)} * var(--u)), calc(${-y} * var(--u))) rotate(${i % 2 ? 3 : -3}deg)`;
+    });
     for (const c of this.cursors) { if (!c.dataset.live) c.classList.remove('on'); delete c.dataset.live; }
     for (const b of this.buttons) {
       if (b.fired) continue;
       let hot = false; const m = 0.15;
-      for (const p of players) for (const hnd of p.rig.hands) if (Math.abs(cx(hnd.x) - b.x) < b.w / 2 + m && Math.abs(hnd.y - b.y) < b.h / 2 + m) hot = true;
+      for (const p of players) for (let h = 0; h < 2; h++) if (Math.abs(cx(p.rig.hands[h].x) - b.x) < b.w / 2 + m && Math.abs(p.rig.cursorY(h) - b.y) < b.h / 2 + m) hot = true;
       if (hot && !b.hot) this.app.audio.hover();
       b.hot = hot; b.p = Math.max(0, Math.min(1, b.p + (hot ? dt / b.dwell : -dt * 1.8)));
       b.el.classList.toggle('hot', hot); b.el.style.setProperty('--p', b.p.toFixed(3));

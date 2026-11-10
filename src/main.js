@@ -2,6 +2,7 @@ import '@fontsource/fredoka/400.css';
 import '@fontsource/fredoka/500.css';
 import '@fontsource/fredoka/600.css';
 import '@fontsource/fredoka/700.css';
+import '@fontsource/bangers/400.css';
 import './style.css';
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -9,9 +10,11 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { ComicPass } from './comic.js';
+import { TOON } from './toon.js';
 import { MARKUP } from './markup.js';
-import { Tracker, PLAYER_COLORS, PLAYER_CSS, PLAYER_NAMES } from './tracking.js';
-import { SimSource } from './sim.js';
+import { Tracker, Rig, PLAYER_COLORS, PLAYER_CSS, PLAYER_NAMES } from './tracking.js';
+import { SimSource, buildSkeleton } from './sim.js';
 import { Avatar } from './avatar.js';
 import { FX } from './fx.js';
 import { AudioEngine } from './audio.js';
@@ -20,7 +23,7 @@ import { HUD, ICONS } from './hud.js';
 import { JellyJam } from './games/jelly.js';
 import { ShapeUp } from './games/walls.js';
 import { CometKeeper } from './games/comet.js';
-import { DanceClass, DanceBattle, GENRES } from './games/dance.js';
+import { DanceClass, DanceBattle, GENRES, demoPose } from './games/dance.js';
 
 const GAMES = [JellyJam, ShapeUp, CometKeeper, DanceClass, DanceBattle];
 const CAM_D = 13;
@@ -34,7 +37,7 @@ class App {
     const canvas = $('c');
     this.lowFx = qs.get('fx') === 'low';
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping; this.renderer.toneMappingExposure = 1.15;
+    this.renderer.toneMapping = THREE.NeutralToneMapping; this.renderer.toneMappingExposure = 1.0;
     this.pixelRatio = +qs.get('pr') || Math.min(window.devicePixelRatio || 1, 1.75);
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(40, 16 / 9, 0.1, 600); this.camera.position.set(0, 0, CAM_D);
@@ -53,8 +56,9 @@ class App {
 
     this.composer = new EffectComposer(this.renderer, new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: 4 }));
     this.composer.addPass(new RenderPass(this.scene, this.camera));
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.5, 0.5, 1.0); this.composer.addPass(this.bloom);
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.38, 0.45, 1.0); this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
+    this.comic = new ComicPass(); this.composer.addPass(this.comic);
 
     this.tracker.onJoin = (p) => this.onJoin(p); this.tracker.onLeave = (p) => this.onLeave(p);
     window.addEventListener('resize', () => this.resize()); this.resize();
@@ -63,7 +67,7 @@ class App {
     $('b-cam').addEventListener('click', () => this.bootCamera());
     $('b-sim').addEventListener('click', () => this.bootSim(2));
     this.env.set('meadow');
-    if (qs.has('sim')) this.bootSim(+qs.get('sim') || 2, true);
+    if (qs.has('sim')) this.bootSim(+qs.get('sim') || 2, true); else this.startDemo();
     this.renderer.setAnimationLoop(() => this.frame());
     window.__ww = this; // handy for testing
   }
@@ -90,7 +94,20 @@ class App {
     }
   }
   bootSim(n, auto = false) { if (!auto) this.audio.init(); this.sim = new SimSource(this.tracker, n); this.sim.intentFn = (i, p, b, t) => this.botIntent(i, p, b, t); this.begin(); }
+  // The four heroes dance on the title screen until someone starts playing.
+  startDemo() {
+    this.demo = [0, 1, 2, 3].map(i => { const a = new Avatar(PLAYER_COLORS[i], i); this.avatarRoot.add(a.group); return { a, rig: new Rig(), P: null, x: [-6.5, -4.7, 4.7, 6.5][i], h: [3.7, 4.5, 4.3, 3.5][i] }; });
+  }
+  updateDemo(dt, t) {
+    this.demo.forEach((d, i) => {
+      const ps = demoPose(i, t * 2);
+      d.P = buildSkeleton({ x: d.x, floor: this.floorY, h: d.h, crouch: ps.c, lean: ps.l * Math.PI / 180, sway: ps.s, arms: ps.a, legs: ps.legs }, d.P);
+      for (let k = 0; k < 33; k++) { const p = d.rig.pts[k]; p.x = d.P[k][0]; p.y = d.P[k][1]; p.v = 1; }
+      d.rig.solve(dt); d.a.update(d.rig, dt, t); if (Math.floor(t * 2) % 8 === i * 2 && d.a.happy < 0.3) d.a.cheer(1);
+    });
+  }
   begin() {
+    if (this.demo) { for (const d of this.demo) d.a.dispose(); this.demo = null; }
     $('boot').classList.add('gone');
     try { navigator.wakeLock?.request('screen').catch(() => {}); } catch (e) { /* optional */ }
     const g = qs.get('game'); const G = g && GAMES.find(x => x.id === g);
@@ -104,12 +121,15 @@ class App {
     this.renderer.setPixelRatio(this.pixelRatio); this.renderer.setSize(w, h, false);
     this.composer.setPixelRatio(this.pixelRatio); this.composer.setSize(w, h);
     this.fx.pmat.uniforms.uScale.value = h * this.pixelRatio * 0.55;
+    TOON.uDot.value = Math.max(4, h * this.pixelRatio / 118); this.comic.uniforms.uDot.value = TOON.uDot.value * 0.8;
     this.w = w; this.h = h;
     $('rotate').classList.toggle('on', h > w * 1.15 && matchMedia('(pointer: coarse)').matches);
   }
   pointer(e) {
     if (!this.sim) return; const r = this.rootEl.getBoundingClientRect();
-    this.sim.setPointer((e.clientX - r.left - r.width / 2) / this.u, -(e.clientY - r.top - r.height / 2) / this.u, performance.now());
+    let y = -(e.clientY - r.top - r.height / 2) / this.u;
+    if (this.phase === 'menu' || this.phase === 'genre' || this.phase === 'results') { const p0 = this.players.find(p => p.slot === 0); if (p0) y = p0.rig.uncursorY(y); } // so the cursor lands under the pointer
+    this.sim.setPointer((e.clientX - r.left - r.width / 2) / this.u, y, performance.now());
   }
 
   get players() { return this.tracker.active; }
@@ -137,16 +157,16 @@ class App {
     $('menu-title').classList.add('on'); $('pip').classList.toggle('on', this.tracker.mode === 'camera');
     this.hud.setButtons(GAMES.map((G, i) => {
       const best = this.best(G.id);
-      return { x: (i - 2) * 3.02, y: 1.72, w: 2.78, h: 3.3, colors: G.colors, html: `${ICONS[G.icon]}<h3>${G.title}</h3><p>${G.blurb}</p>${best ? `<span class="bestv">Best ${best.toLocaleString()}</span>` : ''}`, onSelect: () => (G.dance ? this.enterGenre(G) : this.startGame(G)) };
+      return { x: (i - 2) * 3.08, y: 2.5, w: 2.84, h: 2.3, colors: G.colors, html: `${ICONS[G.icon]}<h3>${G.title}</h3><p>${G.blurb}</p>${best ? `<span class="bestv">Best ${best.toLocaleString()}</span>` : ''}`, onSelect: () => (G.dance ? this.enterGenre(G) : this.startGame(G)) };
     }));
   }
-  toMenu() { if (this.busy) return; this.busy = true; this.hud.wipe('#9d6bff', () => this.enterMenu()).then(() => { this.busy = false; }); }
+  toMenu() { if (this.busy) return; this.busy = true; this.hud.wipe('#9a5bff', () => this.enterMenu()).then(() => { this.busy = false; }); }
   enterGenre(G) {
     if (this.busy) return; this.busy = true;
     this.hud.wipe(G.colors[0], () => {
       this.phase = 'genre'; $('menu-title').classList.remove('on'); this.env.set('stage', 0xff4fa3); this.audio.playMusic('pop');
       this.hud.setButtons([this.exitButton(), ...Object.entries(GENRES).map(([id, g], i) => ({
-        x: (i - 1) * 4.3, y: 1.6, w: 3.6, h: 3.3, colors: g.colors, html: `${ICONS[id]}<h3>${g.name}</h3><p>${g.blurb}</p>`, onSelect: () => this.startGame(G, { genre: id }),
+        x: (i - 1) * 4.3, y: 2.3, w: 3.6, h: 2.6, colors: g.colors, html: `${ICONS[id]}<h3>${g.name}</h3><p>${g.blurb}</p>`, onSelect: () => this.startGame(G, { genre: id }),
       }))]);
       this.hud.banner('Pick your music', '#fff', 1.6);
     }).then(() => { this.busy = false; });
@@ -191,7 +211,7 @@ class App {
     this.audio.duck(true); this.audio.fanfare();
     const w = rows[0]?.slot; if (w !== undefined) this.avatars[w]?.cheer(1);
     this.fx.confetti({ x: -5, y: 0 }, 70); this.fx.confetti({ x: 5, y: 0 }, 70);
-    this.resultsBtns = false;
+    this.resultsBtns = false; this.nextFw = 0.9; this.fwLeft = 3 + stars * 4; this.fx.speedLines();
   }
 
   // ------------------------------------------------------------ frame
@@ -205,9 +225,10 @@ class App {
       fy += p.rig.floorY; this.seen.add(p.slot);
       const a = this.avatars[p.slot]; if (!a) continue;
       a.update(p.rig, dt, t, this.game?.lookTarget?.(p) || null);
-      for (let h = 0; h < 2; h++) if (p.rig.handVel[h].lengthSq() > 40) this.fx.trail(p.rig.hands[h], p.color, 0.2);
+      for (let h = 0; h < 2; h++) this.fx.swoosh(p.slot * 2 + h, p.rig.hands[h], p.color, p.rig.handVel[h].length(), p.rig.S, dt);
     }
     if (this.joinFx) { const p = this.joinFx; this.joinFx = null; this.fx.burst(p.j.chest, { count: 40, color: p.color, speed: 7, size: 0.3 }); this.fx.ring(p.j.chest, p.color, 3, 0.6); this.fx.popup({ x: p.j.head.x, y: p.j.head.y + 1.2 }, p.name + ' joined!', p.css); }
+    if (this.demo) this.updateDemo(dt, t);
     if (players.length) this.floorY += (THREE.MathUtils.clamp(fy / players.length, -4.4, -1.5) - this.floorY) * Math.min(1, dt * 2);
     this.env.update(dt, t, this.floorY, this.audio.ready ? this.audio.beat : t * 2);
 
@@ -224,15 +245,17 @@ class App {
         else { this.hud.count('GO!'); this.audio.go(); this.phase = 'play'; this.game.start(); }
       }
     } else if (this.phase === 'play') {
-      this.game.update(dt, t, players);
+      this.game.update(this.fx.stopT > 0 ? dt * 0.06 : dt, t, players);
       if (this.game.done) this.finish();
     } else if (this.phase === 'results') {
       this.phaseT += dt; this.fx.rain(dt * 0.5);
+      // fireworks: one for every star earned, then a few more for luck
+      if (this.phaseT > this.nextFw && this.fwLeft > 0) { this.fwLeft--; this.nextFw = this.phaseT + 0.35 + Math.random() * 0.5; const c = PLAYER_COLORS[Math.floor(Math.random() * 4)]; this.fx.firework((Math.random() - 0.5) * 13, 0.5 + Math.random() * 3, c); this.audio.pop(Math.floor(Math.random() * 8)); }
       if (this.phaseT > 2.2 && !this.resultsBtns) {
         this.resultsBtns = true; const [G, opts] = this.lastGame;
         this.hud.setButtons([
-          { x: -6, y: 0.6, w: 3, h: 2.6, cls: 'side', colors: ['#2fe0a0', '#12a877'], html: `${ICONS.again}<h3>Play again</h3>`, onSelect: () => this.startGame(G, opts) },
-          { x: 6, y: 0.6, w: 3, h: 2.6, cls: 'side', colors: ['#8f6bff', '#5a35d6'], html: `${ICONS.home}<h3>Menu</h3>`, onSelect: () => this.toMenu() },
+          { x: -6, y: 1.4, w: 3, h: 2.4, cls: 'side', colors: ['#2fe0a0', '#12a877'], html: `${ICONS.again}<h3>Play again</h3>`, onSelect: () => this.startGame(G, opts) },
+          { x: 6, y: 1.4, w: 3, h: 2.4, cls: 'side', colors: ['#8f6bff', '#5a35d6'], html: `${ICONS.home}<h3>Menu</h3>`, onSelect: () => this.toMenu() },
         ]);
       }
     }
@@ -241,6 +264,7 @@ class App {
     const s = this.fx.shakeAmt * 0.25;
     this.camera.position.set((Math.random() - 0.5) * s, (Math.random() - 0.5) * s, CAM_D); this.camera.rotation.set(0, 0, (Math.random() - 0.5) * s * 0.03);
     if (this.noRender) return;
+    this.comic.uniforms.uFlash.value = this.fx.flashAmt;
     if (this.lowFx) this.renderer.render(this.scene, this.camera); else this.composer.render(dt);
 
     // keep it smooth on slower devices by lowering the render resolution
