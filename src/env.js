@@ -228,7 +228,7 @@ export class Environment {
       const geo = new THREE.ConeGeometry(4.5, 34, 24, 1, true); geo.translate(0, -17, 0);
       const s = new THREE.Mesh(geo, add(0xffffff, 0.09)); s.position.set((i - 2.5) * 9, 30, -18 - (i % 2) * 8); s.userData.p = i * 1.3; g.add(s); spots.push(s);
     }
-    const ball = new THREE.Mesh(new THREE.IcosahedronGeometry(2.2, 2), new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.12, flatShading: true })); ball.position.set(0, 11.2, -12); g.add(ball);
+    const ball = new THREE.Mesh(new THREE.IcosahedronGeometry(2.2, 2), new THREE.MeshStandardMaterial({ color: 0x9a9ab8, metalness: 1, roughness: 0.18, flatShading: true })); ball.position.set(0, 11.2, -12); g.add(ball);
     const N = 220, pos = new Float32Array(N * 3), seed = []; for (let i = 0; i < N; i++) seed.push([rnd(0, 6.28), rnd(-1, 1), rnd(10, 34), rnd(0.2, 0.7)]);
     const dg = new THREE.BufferGeometry(); dg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     const dots = new THREE.Points(dg, new THREE.PointsMaterial({ color: 0xffffff, size: 0.6, map: glow(), transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false })); g.add(dots);

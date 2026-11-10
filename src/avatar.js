@@ -119,7 +119,8 @@ export class Avatar {
   update(rig, dt, t, lookAt) {
     const j = rig.j, S = rig.S;
     // pop-in spring
-    this.popV += ((1 - this.pop) * 140 - this.popV * 14) * dt; this.pop += this.popV * dt;
+    const sdt = Math.min(dt, 0.033); // springs stay stable on slow frames
+    this.popV += ((1 - this.pop) * 140 - this.popV * 14) * sdt; this.pop += this.popV * sdt;
     const ps = Math.max(0.001, this.pop);
     this.group.scale.setScalar(ps);
     this.group.position.set(j.hipC.x * (1 - ps), j.hipC.y * (1 - ps), 0);
@@ -163,7 +164,7 @@ export class Avatar {
 
     // springy ears and antennae follow head motion
     const hv = (hx - this.lastHeadX) / Math.max(dt, 1e-3); this.lastHeadX = hx;
-    this.springV += (-this.spring * 90 - this.springV * 7 - hv * 3.5) * dt; this.spring += this.springV * dt;
+    this.springV += (-this.spring * 90 - this.springV * 7 - hv * 3.5) * sdt; this.spring += this.springV * sdt;
     this.spring = THREE.MathUtils.clamp(this.spring, -1, 1);
     for (const w of this.wobblers) w.rotation.z = w.userData.base + this.spring * 0.6;
 

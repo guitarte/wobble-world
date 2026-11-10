@@ -24,6 +24,7 @@ import { DanceClass, DanceBattle, GENRES } from './games/dance.js';
 
 const GAMES = [JellyJam, ShapeUp, CometKeeper, DanceClass, DanceBattle];
 const CAM_D = 13;
+const SITE = 'https://guitarte.github.io/wobble-world/';
 const qs = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
 
@@ -79,9 +80,10 @@ class App {
       this.begin();
     } catch (e) {
       console.warn(e); btn.disabled = false;
-      msg.textContent = (e && (e.name === 'NotAllowedError' || e.message === 'no-camera-api'))
-        ? 'The camera is not available here. Try the mouse or touch mode, or open the full web link.'
-        : 'Could not start the camera. Check that nothing else is using it, then try again.';
+      const blocked = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError' || e.message === 'no-camera-api');
+      const embedded = window.self !== window.top;
+      if (blocked && embedded) msg.innerHTML = `This preview can't use a camera. Play with your body at <a href="${SITE}" target="_blank" rel="noopener">${SITE.replace('https://', '')}</a>, or try the mouse and touch mode here.`;
+      else msg.textContent = blocked ? 'Camera access was blocked. Allow the camera for this page in your browser, then try again.' : 'Could not start the camera. Check that nothing else is using it, then try again.';
     }
   }
   bootSim(n, auto = false) { if (!auto) this.audio.init(); this.sim = new SimSource(this.tracker, n); this.sim.intentFn = (i, p, b, t) => this.botIntent(i, p, b, t); this.begin(); }
@@ -191,7 +193,7 @@ class App {
 
   // ------------------------------------------------------------ frame
   frame(fakeNow) {
-    const now = fakeNow ?? performance.now(); const dt = Math.min(qs.has('sim') ? 0.12 : 0.05, (now - this.last) / 1000); this.frames = (this.frames || 0) + 1; this.last = now; this.t += dt; const t = this.t;
+    const now = fakeNow ?? performance.now(); const dt = Math.min(0.05, (now - this.last) / 1000); this.frames = (this.frames || 0) + 1; this.last = now; this.t += dt; const t = this.t;
     this.sim?.update(now, dt, t);
     this.tracker.update(now, dt);
     const players = this.players;
