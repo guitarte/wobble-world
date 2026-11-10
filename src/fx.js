@@ -58,7 +58,7 @@ class Swoosh {
   constructor(scene, color) {
     this.n = 12; this.h = []; for (let i = 0; i < this.n; i++) this.h.push({ x: 0, y: 0 });
     this.pos = new Float32Array(this.n * 6 * 3); const c = new Float32Array(this.n * 6 * 3), idx = [];
-    const cols = [new THREE.Color(INK), new THREE.Color(color), new THREE.Color(0xffffff)];
+    const cols = [new THREE.Color(INK), new THREE.Color(color), new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.8)];
     for (let i = 0; i < this.n; i++) for (let k = 0; k < 6; k++) cols[k >> 1].toArray(c, (i * 6 + k) * 3);
     for (let s = 0; s < 3; s++) for (let i = 0; i < this.n - 1; i++) { const a = i * 6 + s * 2, b = a + 6; idx.push(a, a + 1, b, a + 1, b + 1, b); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(this.pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(c, 3)); g.setIndex(idx);
@@ -73,10 +73,10 @@ class Swoosh {
     if (steps) { this.lx = x; this.ly = y; }
     const want = THREE.MathUtils.clamp((speed - 5 * S) / (6 * S), 0, 1); this.w += (want - this.w) * Math.min(1, dt * (want > this.w ? 30 : 6));
     this.mesh.visible = this.w > 0.08; if (!this.mesh.visible) return;
-    const pos = this.pos, W = 0.2 * S * this.w, z = 0.5;
+    const pos = this.pos, W = 0.13 * S * this.w, z = 0.5;
     for (let i = 0; i < n; i++) {
       const a = h[Math.max(0, i - 1)], b = h[Math.min(n - 1, i + 1)]; let tx = b.x - a.x, ty = b.y - a.y; const d = Math.hypot(tx, ty) || 1; tx /= d; ty /= d;
-      const u = i / (n - 1), w = W * Math.pow(1 - u, 0.8) * Math.min(1, u * 5 + 0.45), nx = -ty, ny = tx, j = i * 18, ink = Math.min(0.03, w * 0.5);
+      const u = i / (n - 1), w = W * Math.pow(1 - u, 1.25) * Math.min(1, u * 5 + 0.45), nx = -ty, ny = tx, j = i * 18, ink = Math.min(0.03, w * 0.5);
       const hx = i ? h[i].x : x, hy = i ? h[i].y : y;
       const put = (k, off, zz) => { pos[j + k * 3] = hx + nx * off; pos[j + k * 3 + 1] = hy + ny * off; pos[j + k * 3 + 2] = zz; };
       put(0, -w - ink, z); put(1, w + ink, z); put(2, -w, z + 0.01); put(3, w, z + 0.01); put(4, -w * 0.3, z + 0.02); put(5, w * 0.45, z + 0.02);

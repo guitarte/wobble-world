@@ -73,7 +73,7 @@ html, body { margin: 0; height: 100%; background: var(--ink); overflow: hidden; 
 .pic svg { position: absolute; inset: 4% 6% 0; width: 88%; height: 94%; }
 .pic b { position: absolute; left: 0; top: 0; z-index: 1; font-family: 'Bangers', sans-serif; font-weight: 400; font-size: calc(var(--u) * 0.24); background: var(--ink); color: #fff; padding: 0 .35em; line-height: 1.2; }
 .pic.on { transform: scale(1.2) rotate(2deg) translateX(8%); z-index: 2; background: var(--sun); }
-.tagrow { font-weight: 700; font-size: calc(var(--u) * 0.2); color: var(--ink); background: var(--paper); border: calc(var(--u) * 0.03) solid var(--ink); padding: .12em .5em; transform: skewX(-8deg); opacity: .75; white-space: nowrap; }
+.tagrow { font-weight: 700; font-size: calc(var(--u) * 0.2); color: var(--ink); background: var(--paper); border: calc(var(--u) * 0.03) solid var(--ink); padding: .12em .5em; transform: skewX(-8deg); opacity: .75; white-space: nowrap; align-self: flex-start; min-width: 100%; box-sizing: border-box; }
 .tagrow.on { background: var(--ac); color: #fff; text-shadow: var(--ol); opacity: 1; transform: skewX(-8deg) translateX(8%); }
 .tagrow.on::after { content: ' \2713'; }
 
