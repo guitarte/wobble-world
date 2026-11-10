@@ -49,9 +49,9 @@ export class HUD {
   sideActive(i) { if (this.sideOn === i) return; this.sideOn = i; this.sideEl.querySelectorAll('.pic').forEach((e, k) => e.classList.toggle('on', k === i)); }
 
   // ----- big moments
-  banner(text, color = '#fff', dur = 1.3, sub = '') {
+  banner(text, color = '#fff', dur = 1.3, sub = '', cls = '') {
     this.bannerEl.innerHTML = `<div style="color:${color}">${text}</div>${sub ? `<small>${sub}</small>` : ''}`;
-    this.bannerEl.className = ''; void this.bannerEl.offsetWidth; this.bannerEl.className = 'show'; this.bannerEl.style.setProperty('--d', dur + 's');
+    this.bannerEl.className = ''; void this.bannerEl.offsetWidth; this.bannerEl.className = 'show ' + cls; this.bannerEl.style.setProperty('--d', dur + 's');
   }
   count(text) { this.countEl.textContent = text; this.countEl.className = ''; void this.countEl.offsetWidth; this.countEl.className = 'show'; }
   hint(text) { this.hintEl.textContent = text || ''; this.hintEl.classList.toggle('on', !!text); }
@@ -82,23 +82,29 @@ export class HUD {
   fire(b) { if (b.fired) return; b.fired = true; b.el.classList.add('fired'); this.app.audio.select(); b.onSelect(); }
   updateButtons(players, dt) {
     let n = 0; const show = this.buttons.some(b => !b.quiet);
-    const gain = this.app.tracker.reachGain, cx = (x) => Math.max(-7.8, Math.min(7.8, x * gain));
+    // On menus a hand is a stretched pointer. The quiet home button during a game uses the
+    // hand itself, so nobody leaves a game by accident with a big dance move.
+    const cx = (p, h) => (show ? p.rig.cursorX(h) : p.rig.hands[h].x);
+    if (this.app.sim) players = players.filter(p => p.slot === 0); // without a camera only the pointer's hero chooses
     for (const p of players) for (let h = 0; h < 2; h++) {
-      const c = this.cursors[p.slot * 2 + h], pos = p.rig.hands[h];
-      c.style.transform = `translate(calc(${cx(pos.x)} * var(--u)), calc(${-p.rig.cursorY(h)} * var(--u)))`; c.classList.toggle('on', show); c.dataset.live = '1'; n++;
+      const c = this.cursors[p.slot * 2 + h];
+      c.style.transform = `translate(calc(${cx(p, h)} * var(--u)), calc(${-p.rig.cursorY(h)} * var(--u)))`; c.classList.toggle('on', show); c.dataset.live = '1'; n++;
     }
     // name tags float over each hero's head while choosing
     const tagsOn = this.app.phase === 'menu' || this.app.phase === 'genre';
     this.tags.forEach((t, i) => {
-      const p = players.find(q => q.slot === i); t.classList.toggle('on', !!p && tagsOn); if (!p) return;
+      const p = this.app.players.find(q => q.slot === i); t.classList.toggle('on', !!p && tagsOn); if (!p) return;
       const y = Math.max(-4.12, p.rig.floorY - 0.32);
-      t.style.transform = `translate(-50%, -50%) translate(calc(${cx(p.rig.j.hipC.x)} * var(--u)), calc(${-y} * var(--u))) rotate(${i % 2 ? 3 : -3}deg)`;
+      t.style.transform = `translate(-50%, -50%) translate(calc(${Math.max(-7.4, Math.min(7.4, p.rig.j.hipC.x))} * var(--u)), calc(${-y} * var(--u))) rotate(${i % 2 ? 3 : -3}deg)`;
     });
     for (const c of this.cursors) { if (!c.dataset.live) c.classList.remove('on'); delete c.dataset.live; }
     for (const b of this.buttons) {
       if (b.fired) continue;
       let hot = false; const m = 0.15;
-      for (const p of players) for (let h = 0; h < 2; h++) if (Math.abs(cx(p.rig.hands[h].x) - b.x) < b.w / 2 + m && Math.abs(p.rig.cursorY(h) - b.y) < b.h / 2 + m) hot = true;
+      for (const p of players) for (let h = 0; h < 2; h++) if (Math.abs(cx(p, h) - b.x) < b.w / 2 + m && Math.abs(p.rig.cursorY(h) - b.y) < b.h / 2 + m) hot = true;
+      // A hand that is already resting where a new button appears does not count until
+      // it has moved away once, so one long reach cannot pick two things in a row.
+      if (!b.armed) { if (hot) hot = false; else b.armed = true; }
       if (hot && !b.hot) this.app.audio.hover();
       b.hot = hot; b.p = Math.max(0, Math.min(1, b.p + (hot ? dt / b.dwell : -dt * 1.8)));
       b.el.classList.toggle('hot', hot); b.el.style.setProperty('--p', b.p.toFixed(3));

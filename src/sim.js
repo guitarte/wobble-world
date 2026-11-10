@@ -132,7 +132,7 @@ export class SimSource {
     for (let i = 0; i < count; i++) this.bots.push(new Bot(i, count));
     this.pointer = { x: 0, y: 0, t: -1e9, down: false };
     this.acc = 0; this.intentFn = null;
-    tracker.mode = 'sim'; tracker.stageW = 16; tracker.stageH = STAGE_H;
+    tracker.mode = 'sim'; tracker.fit = false; tracker.stageW = 16; tracker.stageH = STAGE_H;
   }
   setPointer(x, y, now) { this.pointer.x = x; this.pointer.y = y; this.pointer.t = now; }
   get pointerActive() { return performance.now() - this.pointer.t < 2500; }
@@ -146,7 +146,7 @@ export class SimSource {
         const hands = intent.hands ? [...intent.hands] : [null, null];
         hands[side] = { x: pt.x, y: pt.y }; if (!intent.hands) hands[1 - side] = null;
         intent.hands = hands; intent.handSpeed = 40;
-        const reach = b.h * 0.33;
+        const reach = b.h * 0.26;
         intent.x = Math.abs(pt.x - b.x) > reach ? pt.x - Math.sign(pt.x - b.x) * reach * 0.9 : b.x;
       }
       b.step(dt, t, intent);

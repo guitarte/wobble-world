@@ -23,7 +23,7 @@ import { HUD, ICONS } from './hud.js';
 import { JellyJam } from './games/jelly.js';
 import { ShapeUp } from './games/walls.js';
 import { CometKeeper } from './games/comet.js';
-import { DanceClass, DanceBattle, GENRES, demoPose } from './games/dance.js';
+import { DanceClass, DanceBattle, GENRES, demoPose, lessonOf, lessonsDone, lessonMoves, DEBUG as DANCE } from './games/dance.js';
 
 const GAMES = [JellyJam, ShapeUp, CometKeeper, DanceClass, DanceBattle];
 const CAM_D = 13;
@@ -69,7 +69,7 @@ class App {
     this.env.set('meadow');
     if (qs.has('sim')) this.bootSim(+qs.get('sim') || 2, true); else this.startDemo();
     this.renderer.setAnimationLoop(() => this.frame());
-    window.__ww = this; // handy for testing
+    window.__ww = this; this.dance = DANCE; // handy for testing
   }
 
   // ------------------------------------------------------------ boot
@@ -83,7 +83,7 @@ class App {
       $('pip').prepend(this.tracker.canvas);
       if (qs.has('rot')) this.tracker.setRotation(+qs.get('rot'));
       $('b-rot').addEventListener('click', () => { this.tracker.setRotation(this.tracker.rotation + 90); this.manualRot = true; });
-      this.tracker.onRotate = () => { if (this.phase === 'menu') this.hud.banner('Camera turned', '#fff', 1.1); };
+      this.tracker.onRotate = () => { if (this.phase === 'menu') this.hud.banner('Camera turned', '#fff', 1.1, '', 'low'); };
       this.begin();
     } catch (e) {
       console.warn(e); btn.disabled = false;
@@ -111,7 +111,7 @@ class App {
     $('boot').classList.add('gone');
     try { navigator.wakeLock?.request('screen').catch(() => {}); } catch (e) { /* optional */ }
     const g = qs.get('game'); const G = g && GAMES.find(x => x.id === g);
-    if (G) this.startGame(G, { genre: qs.get('genre') || 'pop' }); else this.enterMenu();
+    if (G) this.startGame(G, { genre: qs.get('genre') || 'pop', lesson: qs.has('lesson') ? +qs.get('lesson') - 1 : undefined }); else this.enterMenu();
   }
 
   resize() {
@@ -127,9 +127,14 @@ class App {
   }
   pointer(e) {
     if (!this.sim) return; const r = this.rootEl.getBoundingClientRect();
-    let y = -(e.clientY - r.top - r.height / 2) / this.u;
-    if (this.phase === 'menu' || this.phase === 'genre' || this.phase === 'results') { const p0 = this.players.find(p => p.slot === 0); if (p0) y = p0.rig.uncursorY(y); } // so the cursor lands under the pointer
-    this.sim.setPointer((e.clientX - r.left - r.width / 2) / this.u, y, performance.now());
+    this.ptr = { x: (e.clientX - r.left - r.width / 2) / this.u, y: -(e.clientY - r.top - r.height / 2) / this.u };
+    this.sim.setPointer(this.ptr.x, this.ptr.y, performance.now()); this.aimPointer();
+  }
+  // On menus the hand is a stretched pointer, so aim the pretend player's hand where its cursor lands under the real pointer.
+  aimPointer() {
+    if (!this.sim || !this.ptr) return; let { x, y } = this.ptr;
+    if (this.phase === 'menu' || this.phase === 'genre' || this.phase === 'results') { const p0 = this.players.find(p => p.slot === 0); if (p0) { x = p0.rig.uncursorX(x); y = p0.rig.uncursorY(y); } }
+    this.sim.pointer.x = x; this.sim.pointer.y = y;
   }
 
   get players() { return this.tracker.active; }
@@ -144,7 +149,7 @@ class App {
   botIntent(i, p, bot, t) {
     if ((this.phase === 'play' || this.phase === 'count' || this.phase === 'intro') && this.game?.botIntent) return this.game.botIntent(i, p, bot, t, this.phase === 'play');
     if (this.phase === 'menu' || this.phase === 'genre' || this.phase === 'results') { // idle: wave now and then
-      const w = Math.sin(t * 0.5 + i * 2.2) > 0.6; return w ? { arms: i % 2 ? [null, [70 + Math.sin(t * 9) * 14, 70]] : [[70 + Math.sin(t * 9) * 14, 70], null] } : {};
+      const w = i > 0 && Math.sin(t * 0.5 + i * 2.2) > 0.6; return w ? { arms: i % 2 ? [null, [70 + Math.sin(t * 9) * 14, 70]] : [[70 + Math.sin(t * 9) * 14, 70], null] } : {};
     }
     return {};
   }
@@ -166,10 +171,20 @@ class App {
     this.hud.wipe(G.colors[0], () => {
       this.phase = 'genre'; $('menu-title').classList.remove('on'); this.env.set('stage', 0xff4fa3); this.audio.playMusic('pop');
       this.hud.setButtons([this.exitButton(), ...Object.entries(GENRES).map(([id, g], i) => ({
-        x: (i - 1) * 4.3, y: 2.3, w: 3.6, h: 2.6, colors: g.colors, html: `${ICONS[id]}<h3>${g.name}</h3><p>${g.blurb}</p>`, onSelect: () => this.startGame(G, { genre: id }),
+        x: (i - 1) * 4.3, y: 2.3, w: 3.6, h: 2.6, colors: g.colors, html: `${ICONS[id]}<h3>${g.name}</h3><p>${g.blurb}</p>`, onSelect: () => (G === DanceClass ? this.enterLesson(G, id) : this.startGame(G, { genre: id })),
       }))]);
-      this.hud.banner('Pick your music', '#fff', 1.6);
+      this.hud.banner('Pick your music', '#fff', 1.8, '', 'low');
     }).then(() => { this.busy = false; });
+  }
+  // Dance Class: choose which set of four moves to learn.
+  enterLesson(G, id) {
+    const g = GENRES[id], n = g.lessons.length, next = lessonOf(g), done = lessonsDone(g);
+    this.hud.setButtons([this.exitButton(), ...g.lessons.map((_, i) => ({
+      x: (i - (n - 1) / 2) * 4.3, y: 2.15, w: 3.7, h: 2.9, cls: 'lesson', colors: g.colors,
+      html: `<h3>Lesson ${i + 1}</h3><em>${g.titles[i]}</em><p>${lessonMoves(g, i).join('<br>')}</p>${done & (1 << i) ? '<span class="bestv">Done ★</span>' : i === next ? '<span class="bestv">Up next</span>' : ''}`,
+      onSelect: () => this.startGame(G, { genre: id, lesson: i }),
+    }))]);
+    this.hud.banner('Pick a lesson', '#fff', 1.8, '', 'low'); this.audio.playMusic(g.music);
   }
 
   // ------------------------------------------------------------ game flow
@@ -188,7 +203,7 @@ class App {
       this.scores = [0, 0, 0, 0]; this.seen = new Set();
       this.game = new G(this, opts);
       this.hud.showTop(G.title); for (const p of this.players) this.hud.setScore(p.slot, 0);
-      this.hud.howto(G, genre?.name); this.hud.setButtons([this.exitButton()]);
+      this.hud.howto(G, this.game.label || genre?.name); this.hud.setButtons([this.exitButton()]);
       this.phase = 'intro'; this.phaseT = qs.has('fast') ? 0.3 : 4.2;
     }).then(() => { this.busy = false; });
   }
@@ -217,7 +232,7 @@ class App {
   // ------------------------------------------------------------ frame
   frame(fakeNow) {
     const now = fakeNow ?? performance.now(); const dt = Math.min(0.05, (now - this.last) / 1000); this.frames = (this.frames || 0) + 1; this.last = now; this.t += dt; const t = this.t;
-    this.sim?.update(now, dt, t);
+    this.aimPointer(); this.sim?.update(now, dt, t);
     this.tracker.update(now, dt);
     const players = this.players;
     let fy = 0;
@@ -227,13 +242,16 @@ class App {
       a.update(p.rig, dt, t, this.game?.lookTarget?.(p) || null);
       for (let h = 0; h < 2; h++) this.fx.swoosh(p.slot * 2 + h, p.rig.hands[h], p.color, p.rig.handVel[h].length(), p.rig.S, dt);
     }
-    if (this.joinFx) { const p = this.joinFx; this.joinFx = null; this.fx.burst(p.j.chest, { count: 40, color: p.color, speed: 7, size: 0.3 }); this.fx.ring(p.j.chest, p.color, 3, 0.6); this.fx.popup({ x: p.j.head.x, y: p.j.head.y + 1.2 }, p.name + ' joined!', p.css); }
+    if (this.joinFx) { const p = this.joinFx; this.joinFx = null; this.fx.burst(p.j.chest, { count: 40, color: p.color, speed: 7, size: 0.3 }); this.fx.ring(p.j.chest, p.color, 3, 0.6); this.fx.popup({ x: p.j.head.x, y: Math.min(0.8, p.j.head.y + 1.2) }, p.name + ' joined!', p.css); }
     if (this.demo) this.updateDemo(dt, t);
     if (players.length) this.floorY += (THREE.MathUtils.clamp(fy / players.length, -4.4, -1.5) - this.floorY) * Math.min(1, dt * 2);
     this.env.update(dt, t, this.floorY, this.audio.ready ? this.audio.beat : t * 2);
 
     this.tracker.autoRotate = this.phase === 'menu' && !this.manualRot && !qs.has('rot');
-    if (this.phase === 'menu') this.hud.hint(players.length ? '' : (this.sim ? '' : 'Step in front of the camera to join'));
+    // the little camera preview takes the shape of the picture, wide or tall
+    const cv = this.tracker.canvas, ar = cv.width / Math.max(1, cv.height);
+    if (this.tracker.mode === 'camera' && ar !== this.pipAr) { this.pipAr = ar; const w = ar >= 1 ? 2.3 : Math.max(1.25, 2.3 * ar); $('pip').style.setProperty('--pw', w); $('pip').style.setProperty('--ph', w / ar); }
+    if (this.phase === 'menu' || this.phase === 'genre') this.hud.hint(players.length ? this.tracker.advice() : (this.sim ? '' : 'Step in front of the camera to join'));
     else if (this.phase === 'intro') {
       this.phaseT -= dt; this.game.idle?.(dt, t);
       if (this.phaseT <= 0) { this.hud.hideHowto(); this.phase = 'count'; this.phaseT = 0; this.countN = 4; }

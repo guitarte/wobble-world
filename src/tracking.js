@@ -28,6 +28,31 @@ class OneEuro {
 }
 
 const v3 = () => new THREE.Vector3();
+const REACH_SIDE = 2.3;
+
+// ---- Fitting players to the stage
+// People stand at all sorts of distances from the camera, and the camera sits at all
+// sorts of heights. Rather than copying the picture, each player is scaled to hero size
+// and stood on the stage floor, so a small child at the back of the room has the same
+// reach as a grown-up at the front, and nobody's head ends up behind the menu.
+export const FLOOR = -3.7;
+const HERO_T = 1.28; // a hero's torso; the whole body comes out about 4.4 units tall
+// T: torso length in stage units. rel: 0..1 against the tallest player. zoom: 9 / picture height.
+// Returns the scale, and k: 0 = hero-sized on the stage floor, 1 = life-size exactly as filmed.
+function fitFor(T, rel, zoom) {
+  const tgt = HERO_T * (0.88 + 0.12 * rel); // keep a hint of who is taller
+  const k = THREE.MathUtils.smoothstep(T * zoom, 2.3, 3.7);
+  // Past 2.3 the whole body no longer fits in the picture. Ease back to life-size, so
+  // someone sitting right in front of a laptop can still reach the whole screen.
+  return { s: k > 0 ? (tgt + (T - tgt) * k) / T : Math.min(1.7, tgt / T), k };
+}
+const area = (b) => Math.max(0, b.x1 - b.x0) * Math.max(0, b.y1 - b.y0);
+// Is box a sitting on top of box b: nearly the same space, or swallowing most of it?
+function crowds(a, b) {
+  if (!b) return false;
+  const i = Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0));
+  return i > 0.6 * area(b) || i > 0.4 * (area(a) + area(b) - i);
+}
 const JOINTS = ['head', 'neck', 'chest', 'hipC', 'shL', 'shR', 'elL', 'elR', 'wrL', 'wrR', 'haL', 'haR',
   'hipL', 'hipR', 'knL', 'knR', 'anL', 'anR', 'ftL', 'ftR', 'earL', 'earR', 'nose'];
 
@@ -39,7 +64,7 @@ export class Rig {
     this.S = 1.2;            // torso length = the body's unit of scale
     this.standH = 0;         // tallest recent height
     this.floorY = -3.6;
-    this.crouch = 0; this.lean = 0; this.jump = 0; this.energy = 0;
+    this.crouch = 0; this.lean = 0; this.jump = 0; this.energy = 0; this.dip = 0; this.legsSeen = true;
     this.baseHipY = null;
     this.hands = [this.j.haL, this.j.haR];
     this.feet = [this.j.ftL, this.j.ftR];
@@ -60,21 +85,34 @@ export class Rig {
     const shW = j.shL.distanceTo(j.shR);
     const hipsSeen = p[L.hipL].v > 0.35 && p[L.hipR].v > 0.35 && p[L.hipL].y < p[L.shL].y;
     if (!hipsSeen) { // sitting close to the camera: invent hips under the shoulders
-      const t = Math.max(shW * 1.35, 0.6);
+      const t = this.size ?? Math.max(shW * 1.35, 0.6);
       j.hipL.set(j.shL.x * 0.75 + j.shR.x * 0.25, j.chest.y - t, 0);
       j.hipR.set(j.shR.x * 0.75 + j.shL.x * 0.25, j.chest.y - t, 0);
     }
     j.hipC.addVectors(j.hipL, j.hipR).multiplyScalar(0.5);
-    const torso = THREE.MathUtils.clamp(j.chest.distanceTo(j.hipC), 0.45, 3.2);
+    // body size: the tracker's steady measurement when it has one, so bowing towards
+    // the camera (which squashes the torso in the picture) does not shrink the hero
+    const torso = THREE.MathUtils.clamp(this.size ?? j.chest.distanceTo(j.hipC), 0.45, 3.2);
     this.S += (torso - this.S) * Math.min(1, dt * 3);
     const S = this.S;
     const legsSeen = hipsSeen && p[L.knL].v > 0.3 && p[L.knR].v > 0.3;
     const feetSeen = legsSeen && p[L.anL].v > 0.3 && p[L.anR].v > 0.3;
     if (legsSeen) { set('knL', L.knL); set('knR', L.knR); }
-    else { j.knL.set(j.hipL.x - 0.05 * S, j.hipL.y - 0.8 * S, 0); j.knR.set(j.hipR.x + 0.05 * S, j.hipR.y - 0.8 * S, 0); }
+    else {
+      // legs out of the picture: plant the feet on the ground under the hips, and fold
+      // the knees outward when the hips come down, so a squat still looks like a squat
+      const g = Math.min((this.ground ?? j.hipC.y - 1.72 * S) + 0.12 * S, j.hipC.y - 0.5 * S), l = 0.8 * S;
+      for (let s = 0; s < 2; s++) {
+        const sg = s ? 1 : -1, hip = s ? j.hipR : j.hipL, kn = s ? j.knR : j.knL, an = s ? j.anR : j.anL;
+        const dx = sg * 0.08 * S, dy = g - hip.y, d = Math.hypot(dx, dy);
+        if (d >= 2 * l) { kn.set(hip.x + dx / d * l, hip.y + dy / d * l, 0); an.set(hip.x + dx / d * 2 * l, hip.y + dy / d * 2 * l, 0); continue; }
+        const off = Math.sqrt(l * l - d * d / 4); let px = -dy / d, py = dx / d; if (px * sg < 0) { px = -px; py = -py; }
+        kn.set(hip.x + dx / 2 + px * off, hip.y + dy / 2 + py * off, 0); an.set(hip.x + dx, g, 0);
+      }
+    }
     if (feetSeen) { set('anL', L.anL); set('anR', L.anR); set('ftL', L.ftL); set('ftR', L.ftR); }
     else {
-      j.anL.set(j.knL.x, j.knL.y - 0.8 * S, 0); j.anR.set(j.knR.x, j.knR.y - 0.8 * S, 0);
+      if (legsSeen) { j.anL.set(j.knL.x, j.knL.y - 0.8 * S, 0); j.anR.set(j.knR.x, j.knR.y - 0.8 * S, 0); }
       j.ftL.set(j.anL.x - 0.25 * S, j.anL.y - 0.1 * S, 0); j.ftR.set(j.anR.x + 0.25 * S, j.anR.y - 0.1 * S, 0);
     }
     j.neck.copy(j.chest); j.neck.y += 0.12 * S;
@@ -98,19 +136,27 @@ export class Rig {
     const crouchRaw = THREE.MathUtils.clamp((0.9 - hNow / this.standH) / 0.28, 0, 1);
     this.crouch += (crouchRaw - this.crouch) * Math.min(1, dt * 10);
     this.jump = THREE.MathUtils.clamp((j.hipC.y - this.baseHipY) / (0.45 * S) - 0.35, 0, 1) * (crouchRaw < 0.3 ? 1 : 0);
+    // a knee bounce is far too small to count as a crouch: measure it against the hips' resting height
+    this.dip = THREE.MathUtils.clamp((this.baseHipY - j.hipC.y) / (0.22 * S), 0, 1);
+    this.legsSeen = feetSeen;
     this.lean = Math.atan2(j.chest.x - j.hipC.x, Math.max(0.01, j.chest.y - j.hipC.y));
-    this.floorY += ((feetY - 0.12 * S) - this.floorY) * Math.min(1, dt * (feetY < this.floorY ? 4 : 0.6));
+    // the tracker knows where it stood this player; otherwise the floor is wherever the feet settle
+    if (this.ground != null) this.floorY += (this.ground - this.floorY) * Math.min(1, dt * 10);
+    else this.floorY += ((feetY - 0.12 * S) - this.floorY) * Math.min(1, dt * (feetY < this.floorY ? 4 : 0.6));
     let e = 0;
     for (const n of ['haL', 'haR', 'elL', 'elR', 'knL', 'knR', 'anL', 'anR', 'head', 'hipC']) e += j[n].distanceTo(this.prev[n]);
     e = e * idt / (10 * S);
     this.energy += (Math.min(e, 4) - this.energy) * Math.min(1, dt * 5);
   }
 
-  // Where a hand points for menu buttons. Buttons sit along the top of the screen, so
-  // smaller players get extra upward reach: everyone can get there by raising a hand.
+  // Where a hand points for menu buttons. A hand is a pointer, not a paddle: its
+  // movement away from the chest is stretched, so every button can be reached from one
+  // spot without walking, and smaller players can still get to the top row.
   get reachUp() { return THREE.MathUtils.clamp((3.3 - this.j.chest.y) / (1.05 * this.S), 1, 3.6); }
   cursorY(h) { const y = this.hands[h].y, sh = this.j.chest.y; return y <= sh ? y : Math.min(4.3, sh + (y - sh) * this.reachUp); }
   uncursorY(y) { const sh = this.j.chest.y; return y <= sh ? y : sh + (y - sh) / this.reachUp; }
+  cursorX(h) { const c = this.j.chest.x; return THREE.MathUtils.clamp(c + (this.hands[h].x - c) * REACH_SIDE, -7.8, 7.8); }
+  uncursorX(x) { const c = this.j.chest.x; return c + (x - c) / REACH_SIDE; }
 
   // Unit direction of a limb segment, used by the dance games to compare poses.
   dir(a, b, out = v3()) { return out.subVectors(this.j[b], this.j[a]).normalize(); }
@@ -122,7 +168,9 @@ export class Player {
     this.rig = new Rig();
     this.filters = Array.from({ length: 33 }, () => [new OneEuro(), new OneEuro()]);
     this.target = Array.from({ length: 33 }, () => ({ x: 0, y: 0, v: 0 }));
-    this.lastSeen = 0; this.born = 0; this.first = true; this.cx = 0; this.cy = 0;
+    this.lastSeen = 0; this.born = 0; this.first = true; this.cx = 0; this.cy = 0; this.box = null;
+    // T: steady torso length, floor: where the feet rest, stand: hip height when standing (all as filmed)
+    this.fit = { T: 0, floor: null, stand: null, dropT: 0, off: 0, s: 1, k: 0 };
   }
   get j() { return this.rig.j; }
 }
@@ -135,13 +183,23 @@ export class Tracker {
     this.onJoin = null; this.onLeave = null; this.mirror = true;
     this.canvas = document.createElement('canvas'); this.ctx = this.canvas.getContext('2d', { alpha: false });
     this.rotation = 0; this.autoRotate = false; this.sideTurn = 0; this.sideSince = 0;
+    this.fit = true; this.cands = [];
     try { this.rotation = (+localStorage.getItem('ww-rot') || 0) % 360; } catch (e) { /* fine */ }
   }
 
   get active() { return this.players.filter(Boolean); }
   // half-width of the area players can actually reach, and how much to stretch menu cursors to cover the screen
-  get playHalf() { return Math.min(8, this.stageW / 2); }
-  get reachGain() { return 8 / this.playHalf; }
+  // A tall, narrow picture only covers the middle of the stage, so sideways steps are
+  // stretched until walking across the picture is walking across the stage.
+  get gainX() { return this.fit ? THREE.MathUtils.clamp(14 / this.stageW, 1, 2.4) : 1; }
+  get playHalf() { return Math.min(8, this.stageW / 2 * this.gainX); }
+  // A short tip about where to stand, or '' when everyone is in a good spot.
+  advice() {
+    if (this.mode !== 'camera' || !this.fit) return '';
+    let close = false, far = false;
+    for (const p of this.active) { if (p.fit.k > 0.3) close = true; else if (p.fit.T * 9 / this.stageH < 0.6) far = true; }
+    return close ? 'Step back a little so I can see all of you' : far ? 'Come a bit closer' : '';
+  }
 
   async startCamera(facing = 'user') {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('no-camera-api');
@@ -227,45 +285,101 @@ export class Tracker {
     if (now - this.sideSince > 1200) { this.sideTurn = 0; this.setRotation(this.rotation + turn); }
   }
 
+  // One detected body in stage units (mirrored), with what the fit needs to know about it.
+  measure(lm) {
+    const W = this.stageW, H = this.stageH, pts = [];
+    for (let n = 0; n < 33; n++) {
+      const l = lm[n], inside = l.x > -0.04 && l.x < 1.04 && l.y > -0.04 && l.y < 1.04;
+      pts.push({ x: (this.mirror ? 0.5 - l.x : l.x - 0.5) * W, y: (0.5 - l.y) * H, v: inside ? (l.visibility ?? 1) : 0 });
+    }
+    const a = pts[11], b = pts[12], hl = pts[23], hr = pts[24];
+    if ((a.v + b.v) / 2 < 0.45) return null;
+    const shx = (a.x + b.x) / 2, shy = (a.y + b.y) / 2, shW = Math.hypot(a.x - b.x, a.y - b.y);
+    const hips = hl.v > 0.35 && hr.v > 0.35 && hl.y < a.y;
+    const T = hips ? Math.max(0.3, Math.hypot(shx - (hl.x + hr.x) / 2, shy - (hl.y + hr.y) / 2)) : Math.max(shW * 1.35, 0.6);
+    const hipY = hips ? (hl.y + hr.y) / 2 : shy - T;
+    const feet = hips && pts[25].v > 0.3 && pts[26].v > 0.3 && pts[27].v > 0.3 && pts[28].v > 0.3;
+    // the space the body takes up, for telling people (and false alarms) apart
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    for (const n of [0, 11, 12, 23, 24, 25, 26, 27, 28]) { const q = pts[n]; if (n > 12 && q.v < 0.3) continue; x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y); }
+    return {
+      pts, T, hipY, shx, hipOff: hips ? ((hl.x + hr.x) / 2 - shx) / 2 : 0, feetY: feet ? Math.min(pts[27].y, pts[28].y) : null,
+      box: { x0: x0 - 0.25 * T, x1: x1 + 0.25 * T, y0, y1: y1 + 0.4 * T },
+      cx: (a.x + b.x + hl.x + hr.x) / 4, cy: (a.y + b.y + hl.y + hr.y) / 4, used: false,
+    };
+  }
+
   // sets: array of 33-landmark arrays in normalized image coordinates
   ingest(sets, now) {
     const dt = Math.max(1e-3, (now - this.lastDetect) / 1000) || 1 / 30; this.lastDetect = now;
-    const W = this.stageW, H = this.stageH;
     const dets = [];
-    for (const lm of sets) {
-      if (!lm || lm.length < 33) continue;
-      const vis = ((lm[11].visibility ?? 1) + (lm[12].visibility ?? 1)) / 2;
-      if (vis < 0.45) continue;
-      const mx = (x) => (this.mirror ? 0.5 - x : x - 0.5) * W;
-      const cx = mx((lm[11].x + lm[12].x + lm[23].x + lm[24].x) / 4);
-      const my = (y) => (0.5 - y) * H;
-      const cy = my((lm[11].y + lm[12].y + lm[23].y + lm[24].y) / 4);
-      dets.push({ lm, cx, cy, mx, my, used: false });
-    }
-    // match detections to existing players, nearest first
+    for (const lm of sets) { const d = lm && lm.length >= 33 && this.measure(lm); if (d) dets.push(d); }
+    // Match detections to existing players, nearest first. A body can only have moved
+    // so far since it was last seen, and it cannot suddenly be twice the size: that
+    // keeps a false alarm next to a player from stealing their hero.
     const pairs = [];
-    this.players.forEach((p, i) => { if (p) dets.forEach((d, k) => pairs.push({ i, k, dist: Math.hypot(p.cx - d.cx, p.cy - d.cy) })); });
+    this.players.forEach((p, i) => {
+      if (!p) return;
+      const T = p.fit.T || 1.2, reach = Math.max(1, 1.2 * T) * (1 + 2.5 * Math.min(0.9, (now - p.lastSeen) / 1000)), young = now - p.born < 1200;
+      dets.forEach((d, k) => { const dist = Math.hypot(p.cx - d.cx, p.cy - d.cy); if (dist <= reach && (young || !this.fit || d.T < 1.8 * T)) pairs.push({ i, k, dist: dist / reach }); });
+    });
     pairs.sort((a, b) => a.dist - b.dist);
     const taken = new Set();
-    for (const { i, k, dist } of pairs) {
-      if (taken.has(i) || dets[k].used || dist > 3.5) continue;
+    for (const { i, k } of pairs) {
+      if (taken.has(i) || dets[k].used) continue;
       taken.add(i); dets[k].used = true; this.feed(this.players[i], dets[k], now, dt);
     }
-    for (const d of dets) {
-      if (d.used) continue;
-      const slot = this.players.findIndex(p => !p); if (slot < 0) break;
-      const p = new Player(slot); p.born = now; this.players[slot] = p;
+    // Anyone left over is new. The model now and then sees a second "person" on top of a
+    // real one, or one giant made out of two people, so a newcomer has to stand clear of
+    // the players already here and stay in view for a moment before joining.
+    for (const c of this.cands) c.hit = false;
+    const fresh = dets.filter(q => !q.used);
+    for (const d of fresh) {
+      if (this.players.some(p => p && crowds(d.box, p.box)) || fresh.some(o => o !== d && area(o.box) < area(d.box) && crowds(d.box, o.box))) continue;
+      let c = null, best = 2.2;
+      for (const q of this.cands) { const dist = Math.hypot(q.cx - d.cx, q.cy - d.cy); if (!q.hit && dist < best) { best = dist; c = q; } }
+      if (!c) { c = { since: now, n: 0 }; this.cands.push(c); }
+      c.cx = d.cx; c.cy = d.cy; c.n++; c.hit = true; c.miss = 0;
+      if (c.n < 3 || now - c.since < 300) continue;
+      const slot = this.players.findIndex(p => !p); if (slot < 0) continue;
+      const p = new Player(slot); p.born = now; this.players[slot] = p; c.done = true;
       this.feed(p, d, now, dt); this.onJoin?.(p);
     }
+    this.cands = this.cands.filter(c => !c.done && (c.hit || ++c.miss < 2));
   }
 
   feed(p, d, now, dt) {
-    p.lastSeen = now; p.cx = d.cx; p.cy = d.cy;
+    p.lastSeen = now; p.cx = d.cx; p.cy = d.cy; p.box = d.box;
+    let s = 1, ox = 0, oy = 0;
+    if (this.fit) {
+      const f = p.fit, young = now - p.born < 1200;
+      // Body size follows growth quickly and shrinking slowly: bending over squashes the
+      // torso in the picture for a moment, and that must not blow the hero up.
+      f.T = f.T ? f.T + (d.T - f.T) * Math.min(1, dt * (d.T > f.T || young ? 2.5 : 0.12)) : d.T;
+      let fl;
+      if (d.feetY !== null) { fl = d.feetY - 0.12 * f.T; f.stand = d.hipY; f.dropT = 0; }
+      else {
+        // Feet out of the picture: work the floor out from how high the hips ride when
+        // standing. A short dip is a squat; a long one means the player really moved.
+        if (f.stand === null) f.stand = d.hipY;
+        const drop = f.stand - d.hipY;
+        if (drop <= 0) { f.stand -= drop * Math.min(1, dt * 1.5); f.dropT = 0; }
+        else { f.dropT = drop > 0.15 * f.T ? f.dropT + dt : 0; f.stand -= drop * Math.min(1, dt * (f.dropT > 2.5 ? 1.5 : 0.1)); }
+        fl = f.stand - 1.72 * f.T;
+      }
+      f.floor = f.floor === null ? fl : f.floor + (fl - f.floor) * Math.min(1, dt * (fl < f.floor || young ? 6 : 0.7));
+      let hi = f.T; for (const q of this.players) if (q) hi = Math.max(hi, q.fit.T);
+      const r = fitFor(f.T, f.T / hi, 9 / this.stageH); s = f.s = r.s; f.k = r.k;
+      f.off += (d.hipOff - f.off) * Math.min(1, dt * 8);
+      const px = d.shx + f.off; // the point the body is scaled around: midway between shoulders and hips
+      ox = px * (this.gainX - s); oy = (FLOOR - f.floor * s) * (1 - r.k);
+      p.rig.size = f.T * s; p.rig.ground = f.floor * s + oy;
+    }
     for (let n = 0; n < 33; n++) {
-      const l = d.lm[n], t = p.target[n];
-      t.x = p.filters[n][0].filter(d.mx(l.x), dt);
-      t.y = p.filters[n][1].filter(d.my(l.y), dt);
-      t.v = l.visibility ?? 1;
+      const q = d.pts[n], t = p.target[n];
+      t.x = p.filters[n][0].filter(q.x * s + ox, dt);
+      t.y = p.filters[n][1].filter(q.y * s + oy, dt);
+      t.v = q.v;
     }
   }
 }
