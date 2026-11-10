@@ -318,7 +318,12 @@ export class DanceBattle extends DanceBase {
 
     if (this.phase === 'freeze') {
       this.freezeT += dt;
-      if (this.freezeT > 0.6) for (const p of players) if (p.rig.energy > 0.45) this.moved.add(p.slot);
+      // give everyone a moment to react, and remember that a camera never holds a still body
+      // perfectly still: only a real, lasting wiggle counts
+      if (this.freezeT > 1.2) for (const p of players) {
+        if (p.rig.energy > 0.6) p._wig = (p._wig || 0) + dt;
+        if (p._wig > 0.3 || p.rig.energy > 1.4) this.moved.add(p.slot);
+      }
       if (this.freezeT > 3.1) {
         for (const p of players) { if (!this.moved.has(p.slot)) { this.give(p, 200, 'Ice cold! +200', 'big', '#9fe8ff'); fx.ring(p.j.chest, 0x9fe8ff, 3, 0.5); } else fx.popup({ x: p.j.head.x, y: p.j.head.y + 1.3 }, 'Wiggled!', '#ff9ab5'); }
         audio.setMuffle(false); this.done = true;
@@ -326,7 +331,7 @@ export class DanceBattle extends DanceBase {
       return;
     }
     if (beat >= this.total) {
-      this.phase = 'freeze'; this.moved = new Set(); this.spot.material.opacity = 0; hud.banner('FREEZE!', '#9fe8ff', 2.6, 'Hold your pose'); fx.speedLines(); hud.side(''); hud.setStatus('Freeze!'); audio.scratch(); audio.freeze(); audio.setMuffle(true); return;
+      this.phase = 'freeze'; this.moved = new Set(); for (const p of players) p._wig = 0; this.spot.material.opacity = 0; hud.banner('FREEZE!', '#9fe8ff', 2.6, 'Hold your pose'); fx.speedLines(); hud.side(''); hud.setStatus('Freeze!'); audio.scratch(); audio.freeze(); audio.setMuffle(true); return;
     }
     const ti = Math.floor(beat / TURN);
     if (ti < this.turns.length) { if (ti !== this.turnIdx) { if (this.turnIdx >= 0) this.endTurn(); this.beginTurn(ti, players); } }
@@ -343,7 +348,7 @@ export class DanceBattle extends DanceBase {
 
     if (tn?.who === 'cpu') { this.rival += this.cpuTarget / TURN * (audio.bpm / 60) * dt; this.rivalChip(); return; }
     for (const p of act) {
-      const r = p.rig, s = p.slot; p._e = (p._e || 0) + Math.min(r.energy, 2.4) * 48 * mult * dt;
+      const r = p.rig, s = p.slot; p._e = (p._e || 0) + Math.min(Math.max(0, r.energy - 0.25) * 1.12, 2.4) * 48 * mult * dt;
       if (f < 0.2 || f > 0.82) p._near = Math.max(p._near || 0, r.energy); else if (f > 0.4 && f < 0.6) p._mid = r.energy;
       if (r.energy > 0.5 && Math.random() < dt * 10) fx.burst(r.hands[Math.random() < 0.5 ? 0 : 1], { count: 1, color: p.color, speed: 2, size: 0.2, gravity: -1 });
       if (this.phase !== 'finale' && !this.promptDone && tn.prompt.test(r)) { this.promptDone = true; this.tags.add(s + tn.prompt.name); this.give(p, 150, '+150', 'big', '#ffd23f'); fx.word({ x: p.j.head.x, y: p.j.head.y + 2 }, 'NAILED IT!', '#ffd23f', p.css); audio.gold(); fx.confetti(p.j.chest, 30); this.app.avatars[s]?.cheer(1); this.styleCard(s); }

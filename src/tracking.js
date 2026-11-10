@@ -28,7 +28,10 @@ class OneEuro {
 }
 
 const v3 = () => new THREE.Vector3();
-const REACH_SIDE = 2.3;
+// Sideways pointer reach, in torso lengths: a hand near the body moves the pointer gently,
+// and the further it stretches out the faster the pointer runs, so the outermost buttons
+// need neither a locked-straight arm nor a step to the side.
+const REACH_SIDE = 2.3, REACH_KNEE = 0.5, REACH_EXTRA = 3.2;
 
 // ---- Fitting players to the stage
 // People stand at all sorts of distances from the camera, and the camera sits at all
@@ -155,8 +158,15 @@ export class Rig {
   get reachUp() { return THREE.MathUtils.clamp((3.3 - this.j.chest.y) / (1.05 * this.S), 1, 3.6); }
   cursorY(h) { const y = this.hands[h].y, sh = this.j.chest.y; return y <= sh ? y : Math.min(4.3, sh + (y - sh) * this.reachUp); }
   uncursorY(y) { const sh = this.j.chest.y; return y <= sh ? y : sh + (y - sh) / this.reachUp; }
-  cursorX(h) { const c = this.j.chest.x; return THREE.MathUtils.clamp(c + (this.hands[h].x - c) * REACH_SIDE, -7.8, 7.8); }
-  uncursorX(x) { const c = this.j.chest.x; return c + (x - c) / REACH_SIDE; }
+  cursorX(h) {
+    const c = this.j.chest.x, d = (this.hands[h].x - c) / this.S, a = Math.abs(d), o = Math.max(0, a - REACH_KNEE);
+    return THREE.MathUtils.clamp(c + Math.sign(d) * this.S * (REACH_SIDE * a + REACH_EXTRA * o * o), -7.8, 7.8);
+  }
+  uncursorX(x) {
+    const c = this.j.chest.x, X = Math.abs(x - c) / this.S; let a = X / REACH_SIDE;
+    if (a > REACH_KNEE) { const B = REACH_SIDE - 2 * REACH_EXTRA * REACH_KNEE, C = REACH_EXTRA * REACH_KNEE * REACH_KNEE - X; a = (-B + Math.sqrt(B * B - 4 * REACH_EXTRA * C)) / (2 * REACH_EXTRA); }
+    return c + Math.sign(x - c) * a * this.S;
+  }
 
   // Unit direction of a limb segment, used by the dance games to compare poses.
   dir(a, b, out = v3()) { return out.subVectors(this.j[b], this.j[a]).normalize(); }

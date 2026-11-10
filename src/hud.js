@@ -91,9 +91,9 @@ export class HUD {
       c.style.transform = `translate(calc(${cx(p, h)} * var(--u)), calc(${-p.rig.cursorY(h)} * var(--u)))`; c.classList.toggle('on', show); c.dataset.live = '1'; n++;
     }
     // name tags float over each hero's head while choosing
-    const tagsOn = this.app.phase === 'menu' || this.app.phase === 'genre';
+    const ph = this.app.phase, tagsOn = ph === 'menu' || ph === 'genre' || ph === 'results';
     this.tags.forEach((t, i) => {
-      const p = this.app.players.find(q => q.slot === i); t.classList.toggle('on', !!p && tagsOn); if (!p) return;
+      const p = this.app.players.find(q => q.slot === i); t.classList.toggle('on', !!p && tagsOn); t.classList.toggle('win', ph === 'results' && !!this.app.winSlots?.includes(i)); if (!p) return;
       const y = Math.max(-4.12, p.rig.floorY - 0.32);
       t.style.transform = `translate(-50%, -50%) translate(calc(${Math.max(-7.4, Math.min(7.4, p.rig.j.hipC.x))} * var(--u)), calc(${-y} * var(--u))) rotate(${i % 2 ? 3 : -3}deg)`;
     });
@@ -115,9 +115,11 @@ export class HUD {
   // ----- results
   showResults({ title, rows, stars, best, isBest, note }) {
     const starHtml = [0, 1, 2].map(i => `<span class="star ${i < stars ? 'lit' : ''}" style="animation-delay:${0.5 + i * 0.25}s">★</span>`).join('');
-    this.resEl.innerHTML = `<div class="res-card"><h2>${title}</h2><div class="stars">${starHtml}</div>
-      <div class="rows">${rows.map((r, i) => `<div class="row ${i === 0 ? 'win' : ''}" style="--pc:${r.css};animation-delay:${0.2 + i * 0.15}s"><b>${r.badge ?? (i + 1)}</b><i></i><span>${r.name}</span><strong data-to="${r.score}">0</strong></div>`).join('')}</div>
-      <div class="best ${isBest ? 'new' : ''}">${isBest ? 'New best score!' : (best ? `Best: ${best.toLocaleString()}` : '')}</div>${note ? `<div class="note">${note}</div>` : ''}</div>`;
+    // a short, wide card: it has to leave the heroes' faces in view below it
+    const rank = rows.map(r => 1 + rows.filter(o => o.score > r.score).length); // equal scores share a place
+    this.resEl.innerHTML = `<div class="res-card"><div class="res-head"><h2>${title}</h2><div class="stars">${starHtml}</div></div>
+      <div class="rows ${rows.length < 2 ? 'one' : ''}">${rows.map((r, i) => `<div class="row ${rank[i] === 1 ? 'win' : ''}" style="--pc:${r.css};animation-delay:${0.2 + i * 0.15}s"><b>${r.badge ?? rank[i]}</b><i></i><span>${r.name}</span><strong data-to="${r.score}">0</strong></div>`).join('')}</div>
+      <div class="res-foot"><div class="best ${isBest ? 'new' : ''}">${isBest ? 'New best score!' : (best ? `Best: ${best.toLocaleString()}` : '')}</div>${note ? `<div class="note">${note}</div>` : ''}</div></div>`;
     this.resEl.classList.add('on');
     const t0 = performance.now();
     const tick = () => {

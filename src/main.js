@@ -222,9 +222,9 @@ class App {
     const best = this.best(G.id), isBest = top > best && top > 0;
     if (isBest) { try { localStorage.setItem('ww-best-' + G.id, top); } catch (e) { /* fine */ } }
     this.hud.hideTop(); this.hud.clearButtons(); this.hud.hint('');
-    this.hud.showResults({ title: custom.title || (rows.length > 1 ? `${rows[0].name} wins!` : 'Nice moves!'), rows, stars, best, isBest, note: custom.note });
+    this.hud.showResults({ title: custom.title || (rows.length > 1 ? (rows[1].score === rows[0].score ? "It's a tie!" : `${rows[0].name} wins!`) : 'Nice moves!'), rows, stars, best, isBest, note: custom.note });
     this.audio.duck(true); this.audio.fanfare();
-    const w = rows[0]?.slot; if (w !== undefined) this.avatars[w]?.cheer(1);
+    this.winSlots = rows.filter(r => r.slot !== undefined && r.score === rows[0].score).map(r => r.slot); this.nextRing = 0.6; for (const w of this.winSlots) this.avatars[w]?.cheer(1);
     this.fx.confetti({ x: -5, y: 0 }, 70); this.fx.confetti({ x: 5, y: 0 }, 70);
     this.resultsBtns = false; this.nextFw = 0.9; this.fwLeft = 3 + stars * 4; this.fx.speedLines();
   }
@@ -267,13 +267,18 @@ class App {
       if (this.game.done) this.finish();
     } else if (this.phase === 'results') {
       this.phaseT += dt; this.fx.rain(dt * 0.5);
+      // the winner stands in a pulsing gold ring
+      if (this.phaseT > this.nextRing) {
+        this.nextRing = this.phaseT + 0.75;
+        for (const wp of players) if (this.winSlots.includes(wp.slot)) { this.fx.ring(wp.rig.j.chest, 0xffd23f, 2.3, 0.7, 0.5); this.avatars[wp.slot]?.cheer(0.4); }
+      }
       // fireworks: one for every star earned, then a few more for luck
       if (this.phaseT > this.nextFw && this.fwLeft > 0) { this.fwLeft--; this.nextFw = this.phaseT + 0.35 + Math.random() * 0.5; const c = PLAYER_COLORS[Math.floor(Math.random() * 4)]; this.fx.firework((Math.random() - 0.5) * 13, 0.5 + Math.random() * 3, c); this.audio.pop(Math.floor(Math.random() * 8)); }
       if (this.phaseT > 2.2 && !this.resultsBtns) {
         this.resultsBtns = true; const [G, opts] = this.lastGame;
         this.hud.setButtons([
-          { x: -6, y: 1.4, w: 3, h: 2.4, cls: 'side', colors: ['#2fe0a0', '#12a877'], html: `${ICONS.again}<h3>Play again</h3>`, onSelect: () => this.startGame(G, opts) },
-          { x: 6, y: 1.4, w: 3, h: 2.4, cls: 'side', colors: ['#8f6bff', '#5a35d6'], html: `${ICONS.home}<h3>Menu</h3>`, onSelect: () => this.toMenu() },
+          { x: -6, y: 1.95, w: 3, h: 2.3, cls: 'side', colors: ['#2fe0a0', '#12a877'], html: `${ICONS.again}<h3>Play again</h3>`, onSelect: () => this.startGame(G, opts) },
+          { x: 6, y: 1.95, w: 3, h: 2.3, cls: 'side', colors: ['#8f6bff', '#5a35d6'], html: `${ICONS.home}<h3>Menu</h3>`, onSelect: () => this.toMenu() },
         ]);
       }
     }
