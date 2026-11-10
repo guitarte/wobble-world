@@ -26,7 +26,7 @@ function makeBalloon(type) {
 
 export class BalloonBop {
   static id = 'balloon'; static title = 'Balloon Bop'; static blurb = 'Keep the balloons off the ground'; static icon = 'balloon';
-  static colors = ['#ff5a78', '#a8246b']; static theme = 'toybox'; static music = 'toy'; static stars = [700, 1500, 2600]; static ar = true;
+  static colors = ['#ff5a78', '#a8246b']; static theme = 'toybox'; static music = 'toy'; static stars = [800, 1800, 3200]; static ar = true;
   static howto = ['Bop the balloons back up with hands, head or feet', 'Work together: a long rally multiplies the score', 'A balloon on the floor costs the team a heart', 'The gold balloon is worth extra'];
 
   constructor(app) {

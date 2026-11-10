@@ -21,7 +21,7 @@ function makeCloud() {
 
 export class WingIt {
   static id = 'wing'; static title = 'Wing It'; static blurb = 'Arms out! Fly through the rings'; static icon = 'wing';
-  static colors = ['#3aa0ff', '#2b4fd6']; static theme = 'clouds'; static music = 'sky'; static stars = [900, 2200, 3800];
+  static colors = ['#3aa0ff', '#2b4fd6']; static theme = 'clouds'; static music = 'sky'; static stars = [1200, 3500, 7000];
   static howto = ['Hold your arms out like wings', 'Tip them like a plane to slide left and right', 'Arms up to climb, arms down to dive', 'Fly through the rings and dodge the storm clouds'];
 
   constructor(app) {

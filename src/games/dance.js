@@ -153,23 +153,23 @@ function picto(pose) {
 }
 const intentFor = (pose, extra = {}) => ({ arms: pose.a, crouch: pose.c, lean: pose.l * D, sway: pose.s, legs: pose.legs, snap: 20, followPointer: false, ...extra });
 
-class Coach {
+export class Coach {
   constructor(app, accent) {
     this.app = app; this.rig = new Rig(); this.holder = new THREE.Group(); this.holder.position.z = -4.5; app.root.add(this.holder);
-    this.avatar = new Avatar({ ...COACH, accent, shoe: accent }); this.holder.add(this.avatar.group); this.h = 4.8; this.x = 0; this.P = null;
+    this.avatar = new Avatar({ ...COACH, accent, shoe: accent }); this.holder.add(this.avatar.group); this.h = 4.8; this.rise = RISE; this.wide = 1; this.x = 0; this.P = null;
     const riser = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 3.1, RISE, 40), sceneToon(0x3a1c6e, { emissive: accent, emissiveIntensity: 0.25 }));
     this.riser = riser; this.holder.add(riser); inkGroup(riser);
     this.rim = new THREE.Mesh(new THREE.TorusGeometry(2.62, 0.07, 8, 60), new THREE.MeshBasicMaterial({ color: accent })); this.rim.rotation.x = Math.PI / 2; this.holder.add(this.rim);
   }
   update(pose, dt, t) {
-    const floor = this.app.floorY; this.riser.position.y = floor + RISE / 2; this.rim.position.y = floor + RISE + 0.02;
+    const floor = this.app.floorY, R = this.rise; this.riser.position.y = floor + R / 2; this.riser.scale.set(this.wide, R / RISE, this.wide); this.rim.position.y = floor + R + 0.02;
     const step = Math.floor(t * 12); // the coach is animated "on twos", like a comic in motion
     if (step !== this.step || !this.P) {
-      this.step = step; this.P = buildSkeleton({ x: this.x, floor: floor + RISE, h: this.h, crouch: pose.c, lean: pose.l * D, sway: pose.s, arms: pose.a, legs: pose.legs }, this.P);
+      this.step = step; this.P = buildSkeleton({ x: this.x, floor: floor + R, h: this.h, crouch: pose.c, lean: pose.l * D, sway: pose.s, arms: pose.a, legs: pose.legs, jump: pose.j || 0 }, this.P);
       for (let i = 0; i < 33; i++) { const p = this.rig.pts[i]; p.x = this.P[i][0]; p.y = this.P[i][1]; p.v = 1; }
     }
     this.rig.solve(dt); this.avatar.update(this.rig, dt, t, null);
-    this.rim.scale.setScalar(1 + this.app.env.beatPulse * 0.06);
+    this.rim.scale.setScalar(this.wide * (1 + this.app.env.beatPulse * 0.06));
   }
 }
 

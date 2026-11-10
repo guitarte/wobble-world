@@ -59,6 +59,7 @@ html, body { margin: 0; height: 100%; background: var(--ink); overflow: hidden; 
 @keyframes wiggle { from { transform: rotate(-9deg) scale(1.05); } to { transform: rotate(9deg) scale(1.15); } }
 .btn h3 { margin: .1em 0 0; font-size: calc(var(--u) * 0.47); line-height: .95; text-shadow: var(--ol), .08em .1em 0 var(--ink); white-space: nowrap; }
 .btn p { margin: .3em .5em 0; font-size: calc(var(--u) * 0.185); font-weight: 600; color: var(--ink); background: var(--paper); border: calc(var(--u) * 0.03) solid var(--ink); padding: .16em .55em; text-align: center; line-height: 1.12; transform: rotate(-1.2deg); }
+.btn.slim h3 { font-size: calc(var(--u) * 0.4); } .btn.slim p { font-size: calc(var(--u) * 0.165); margin: .3em .35em 0; } /* six cards on one page */
 .btn .cam { position: absolute; left: 3%; top: 4%; width: 17%; line-height: 0; transform: rotate(-6deg); } .btn .cam svg { width: 100%; max-height: none; }
 .btn .bestv { position: absolute; right: 3%; top: 4%; font-size: calc(var(--u) * 0.16); background: var(--sun); color: var(--ink); border: calc(var(--u) * 0.028) solid var(--ink); padding: .1em .5em; font-weight: 700; transform: rotate(5deg); }
 .btn.lesson h3 { font-size: calc(var(--u) * 0.5); } .btn.lesson em { font-style: normal; font-weight: 700; font-size: calc(var(--u) * 0.2); color: var(--ink); background: var(--sun); border: calc(var(--u) * 0.03) solid var(--ink); padding: .05em .6em; margin-top: .25em; transform: rotate(1.5deg); }
@@ -112,6 +113,12 @@ html, body { margin: 0; height: 100%; background: var(--ink); overflow: hidden; 
 #banner > div { display: inline-block; transform: rotate(-3deg) skewX(-6deg); padding: 0 .3em; }
 #banner small { display: table; margin: .5em auto 0; font-family: 'Fredoka', sans-serif; letter-spacing: 0; font-size: .22em; font-weight: 600; color: var(--ink); background: var(--paper); border: calc(var(--u) * 0.035) solid var(--ink); box-shadow: calc(var(--u) * 0.05) calc(var(--u) * 0.05) 0 var(--ink); padding: .25em .9em; text-shadow: none; transform: rotate(1deg); line-height: 1.2; }
 #banner.low { top: 52%; font-size: calc(var(--u) * 1.05); } /* menu prompts sit below the buttons */
+#banner.said { top: 12%; font-size: calc(var(--u) * 1.02); }
+/* Coach Dot's calls: a speech bubble beside the coach, so the coach can still be seen showing the pose */
+#banner.says { left: 2%; right: 56.5%; top: 15.5%; font-size: calc(var(--u) * .74); display: flex; flex-direction: column-reverse; align-items: flex-end; }
+#banner.says > div { white-space: nowrap; transform-origin: 100% 50%; }
+#banner.says small { margin: 0 .5em .22em 0; font-family: 'Bangers', 'Fredoka', Impact, sans-serif; font-weight: 400; font-size: .58em; letter-spacing: .07em; text-transform: uppercase; background: #7cf05a; padding: .08em .8em .02em; transform: rotate(-2deg); }
+#banner.says.trick small { visibility: hidden; }
 #banner.show { animation: banner var(--d, 1.3s) cubic-bezier(.2, 1.2, .3, 1) forwards; }
 @keyframes banner { 0% { transform: scale(.2) rotate(-10deg); opacity: 0; } 12% { transform: scale(1.18) rotate(2deg); opacity: 1; } 22% { transform: scale(1); } 82% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
 #count { position: absolute; inset: 0; display: grid; place-items: center; font-size: calc(var(--u) * 3.8); opacity: 0; color: var(--sun); text-shadow: var(--ol), .05em .06em 0 var(--pink), .08em .1em 0 var(--ink); }

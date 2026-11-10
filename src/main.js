@@ -30,14 +30,20 @@ import { BalloonBop } from './games/balloon.js';
 import { LaserLeap } from './games/laser.js';
 import { WingIt } from './games/wing.js';
 import { TurboTrot } from './games/trot.js';
+import { PowBlocks } from './games/pow.js';
+import { ToppleTower } from './games/topple.js';
+import { FreezeFrame } from './games/freeze.js';
+import { DotSays } from './games/dotsays.js';
+import { WobbleBowl } from './games/bowl.js';
 import { Mirror } from './mirror.js';
 
 // The game library, a page of five at a time. The mirror page needs a real camera: it
 // shows the players themselves, in their own room, with the game drawn on top.
 const PAGES = [
-  { name: 'Action', games: [JellyJam, ShapeUp, CometKeeper, PaperChop, DanceClass] },
-  { name: 'Sports and party', games: [BalloonBop, WingIt, LaserLeap, TurboTrot, DanceBattle] },
-  { name: 'Mirror mode', camera: true, opts: { ar: true }, games: [BalloonBop, PaperChop, JellyJam] },
+  { name: 'Action', games: [JellyJam, ShapeUp, CometKeeper, PaperChop, PowBlocks] },
+  { name: 'Sports and party', games: [BalloonBop, WingIt, LaserLeap, TurboTrot, WobbleBowl] },
+  { name: 'Dance and brain', games: [DanceClass, DanceBattle, FreezeFrame, DotSays, ToppleTower] },
+  { name: 'Mirror mode', camera: true, opts: { ar: true }, games: [BalloonBop, PaperChop, JellyJam, PowBlocks, ToppleTower, FreezeFrame] },
 ];
 const GAMES = [...new Set(PAGES.flatMap(p => p.games))];
 // The hero creator, one choice at a time.
@@ -209,7 +215,7 @@ class App {
     $('menu-note').textContent = pg.camera ? 'Mirror mode: see yourself in the game!' : `${pg.name} (${this.page + 1} of ${pages.length}): hold a hand on a game to play!`;
     const cards = pg.games.map((G, i) => {
       const best = this.best(G.id);
-      return { x: (i - (n - 1) / 2) * 3.08, y: 2.5, w: 2.84, h: 2.3, colors: G.colors, html: `${ICONS[G.icon]}<h3>${G.title}</h3><p>${G.blurb}</p>${best ? `<span class="bestv">Best ${best.toLocaleString()}</span>` : ''}`, onSelect: () => (G.dance ? this.enterGenre(G) : this.startGame(G, pg.opts)) };
+      return { x: (i - (n - 1) / 2) * (n > 5 ? 2.58 : 3.08), y: 2.5, w: n > 5 ? 2.44 : 2.84, h: 2.3, cls: n > 5 ? 'slim' : '', colors: G.colors, html: `${ICONS[G.icon]}<h3>${G.title}</h3><p>${G.blurb}</p>${best ? `<span class="bestv">Best ${best.toLocaleString()}</span>` : ''}`, onSelect: () => (G.dance ? this.enterGenre(G) : this.startGame(G, pg.opts)) };
     });
     if (pg.camera) for (const c of cards) c.html += `<span class="cam">${ICONS.mirror}</span>`;
     cards.push(this.sideButton(-6.85, `${ICONS.hero}<h3>Heroes</h3>`, ['#ff8a3d', '#d6306f'], () => this.enterHeroes()));
@@ -304,7 +310,7 @@ class App {
   // ------------------------------------------------------------ game flow
   best(id) { try { return +localStorage.getItem('ww-best-' + id) || 0; } catch (e) { return 0; } }
   cleanupGame() {
-    this.game?.dispose?.(); this.game = null; this.root.clear(); this.fx.clear();
+    this.game?.dispose?.(); this.game = null; this.root.clear(); this.fx.clear(); for (const a of this.avatars) if (a) a.size = 1;
     this.hud.hideTop(); this.hud.hideHowto(); this.hud.hideResults(); this.hud.clearButtons(); this.hud.hint('');
     $('menu-title').classList.remove('on'); $('pip').classList.remove('on');
   }
@@ -324,10 +330,11 @@ class App {
   addScore(slot, pts, pos, o = {}) {
     this.scores[slot] = Math.max(0, this.scores[slot] + pts); this.hud.setScore(slot, this.scores[slot], o.sub);
     if (pos) this.fx.popup(pos, o.text ?? (pts > 0 ? '+' + pts : String(pts)), o.color ?? PLAYER_CSS[slot], o.cls || '');
-    if (pts > 0) this.avatars[slot]?.cheer(o.cheer ?? 0.5);
+    if (pts > 0 && o.cheer !== 0) this.avatars[slot]?.cheer(o.cheer ?? 0.5);
   }
   finish() {
     if (this.phase !== 'play') return; this.phase = 'results'; this.phaseT = 0;
+    this.avatarRoot.scale.setScalar(1); this.avatarRoot.position.set(0, 0, 0); for (const a of this.avatars) if (a) a.size = 1; // heroes a game shrank are full size again for the results
     const G = this.game.constructor; const custom = this.game.results?.() || {};
     const slots = [...this.seen].sort((a, b) => this.scores[b] - this.scores[a]);
     const rows = custom.rows || slots.map(s => ({ name: PLAYER_NAMES[s], css: PLAYER_CSS[s], score: this.scores[s], slot: s }));

@@ -77,6 +77,12 @@ const TRACKS = {
     k: 'x..x......x..x..', s: '....x.......x...', c: '....x.......x...', h: 'x.xxx.xxx.xxx.xx', bass: '0..0.8..0.0..5.8', stab: '..x..x....x..x..',
     lead: [_, _, 12, _, 15, 12, _, 10, 12, _, _, _, 7, _, 10, _, _, _, 12, _, 15, 17, _, 15, 12, _, 10, _, 12, _, _, _], leadType: 'saw', pad: false,
   },
+  // a rolling boogie for the bowling lanes
+  bowl: {
+    bpm: 128, root: 60, swing: 0.2, chords: [[0, 4, 7, 9], [0, 4, 7, 9], [5, 9, 12, 14], [7, 11, 14, 17]],
+    k: 'x.....x.x.....x.', s: '....x.......x...', c: '....x.......x...', h: 'x.x.x.x.x.x.x.x.', bass: '0.5.8.5.0.5.8.5.', stab: 'x..x..x.....x...',
+    lead: [_, _, 7, 9, 12, _, 9, 7, 4, _, 7, _, _, _, _, _, _, _, 9, 12, 14, _, 12, 9, 7, _, 4, _, 0, _, _, _], leadType: 'square', pad: false,
+  },
   // tiptoeing along, for careful balancing
   sneak: {
     bpm: 96, root: 62, swing: 0.2, chords: [[0, 3, 7], [-4, 0, 3], [-2, 2, 5], [-5, -1, 2]],

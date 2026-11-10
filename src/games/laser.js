@@ -35,7 +35,7 @@ function makeBeam(type) {
 
 export class LaserLeap {
   static id = 'laser'; static title = 'Laser Leap'; static blurb = 'Jump the low beams, duck the high ones'; static icon = 'laser';
-  static colors = ['#12b5d6', '#5a2bd6']; static theme = 'neon'; static music = 'arcade'; static stars = [700, 1500, 2500];
+  static colors = ['#12b5d6', '#5a2bd6']; static theme = 'neon'; static music = 'arcade'; static stars = [800, 2000, 3600];
   static howto = ['Blue beams roll along the floor: jump over them', 'Pink beams hang from above: duck under them', 'Clear beams in a row to multiply your score', 'Grab the gold stars in between'];
 
   constructor(app) {

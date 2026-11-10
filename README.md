@@ -2,19 +2,41 @@
 
 A family motion-game console that runs in a web browser. A camera watches the room, tracks up to four bodies, and turns each player into a comic-book hero on screen. No controllers: your body is the controller.
 
-The whole thing is drawn like a living comic: cel-shaded heroes with ink outlines and manga faces, halftone dots, misprinted colour edges, starburst impacts and big lettering. The four heroes are Ember, Zeph, Volt and Nova, and Coach Dot runs the dance floor.
+The whole thing is drawn like a living comic: cel-shaded heroes with ink outlines and manga faces, halftone dots, misprinted colour edges, starburst impacts and big lettering. Players start as Ember, Zeph, Volt and Nova, can swap to other heroes or build their own, and Coach Dot runs the dance floor.
 
 **Play it:** https://guitarte.github.io/wobble-world/
 
 ## Games
+
+Fifteen games, spread over three pages of the menu. Point at "More games" to turn the page.
 
 | Game | What you do |
 | --- | --- |
 | Jelly Jam | Pop drifting jellies with hands, feet or head. Combos, gold jellies, giant jellies that split, frenzy mode, spiky urchins to avoid, and King Jelly to punch out at the end. |
 | Shape Up | Walls rush toward you with a hole cut to each player's size. Duck, make a star, reach up or scoot sideways to slip through. Touch the gems for a perfect. The last three walls come fast and score double. |
 | Comet Keeper | Block comets before they hit the shared shield, and step out of the way of the mines. It ends with a meteor shower bonus round. |
+| Paper Chop | Paper critters leap up over a sunset garden. Slice them with fast hands. Slicing a few in a row builds a combo, gold stars are worth the most, and thunder clouds are best left alone. |
+| Pow Blocks | Bat a bouncing ball upward with hands, head or feet to smash walls of bricks. Steel bricks take two hits, gold ones give a second ball, and the team shares five hearts. |
+| Balloon Bop | Keep the balloons off the ground together. Every bop builds the rally, gold balloons pop for a bonus after three bops, and gusts of wind push everything sideways. |
+| Wing It | Hold your arms out like wings to fly a paper glider: tip them to slide sideways, raise them to climb. Fly through the rings and dodge the storm clouds. |
+| Laser Leap | Robots slide in with laser beams. Jump the low blue ones and duck under the high pink ones. Clearing beams in a row builds a multiplier, and there are gold stars to grab in between. |
+| Turbo Trot | A 150 metre race run on the spot. Lift your knees and pump your arms to speed up, and jump the hurdles. |
+| Wobble Bowl | Everyone bowls at once on toy lanes. Let a hand hang down to pick up the ball, swing it up to bowl, and swing a little sideways to steer. Strikes in a row score extra. |
 | Dance Class | Pick a style and a lesson. Coach Dot teaches four real moves one at a time, with a tip for each, then you dance the whole routine. Scored on how well you match each count on the beat. A four-panel strip at the side shows the move. |
 | Dance Battle | Take turns freestyling in the spotlight. Scored on energy, rhythm and variety. Each turn has a challenge move drawn at the side, a list of real style moves to collect, and a freeze at the end. |
+| Freeze Frame | Musical statues. Dance while the music plays, then freeze when it stops. Snapper the camera bot sweeps its searchlight looking for wobbles, then takes the picture. Bold poses score a bonus. |
+| Dot Says | Coach Dot calls out things to do. If the call says DOT SAYS, do it fast. If it does not, it is a trick, and anyone who moves is caught out. |
+| Topple Tower | Step under falling blocks to stack them on your head, then move gently, because a tall tower sways. Six blocks make a tower that flies off to the bank. Do not catch the cactus. |
+
+Every game ends with a double-points finale, and every game has its own original music.
+
+### Mirror mode
+
+With a camera, a fourth menu page appears: Mirror mode. The games on it (Balloon Bop, Paper Chop, Jelly Jam, Pow Blocks, Topple Tower and Freeze Frame) show the live camera picture of your real room and your real selves, with the game drawn on top, instead of the heroes and the cartoon world. Each player gets a ring in their colour around each hand, and everything in the game is sized to how big the players look on camera.
+
+### Heroes
+
+Point at "Heroes" on the menu to change who you are. Each player picks from eight ready-made heroes, or builds their own in the creator: hair, hair colour, skin, outfit and trim colours, outfit cut, badge, extras (scarf or cape) and a name. Heroes you build are saved on the device.
 
 The dance games come in three styles of original music: pop, K-pop and hip hop.
 
@@ -53,7 +75,7 @@ npm run dev      # local dev server
 npm run build    # production build in dist/
 ```
 
-Handy URL options: `?sim=2` starts with two pretend players (no camera), `?game=jelly|walls|comet|lesson|battle` jumps straight into a game, `?genre=pop|kpop|hiphop` picks the dance music, `?lesson=2` picks the dance lesson, `?fx=low` turns off the glow and comic print passes, `?rot=90` forces the camera rotation.
+Handy URL options: `?sim=2` starts with two pretend players (no camera), `?game=<id>` jumps straight into a game (`jelly`, `walls`, `comet`, `chop`, `pow`, `balloon`, `wing`, `laser`, `trot`, `bowl`, `lesson`, `battle`, `freeze`, `dot`, `topple`), `?ar=1` plays it in mirror mode, `?page=2` opens the menu on a given page, `?genre=pop|kpop|hiphop` picks the dance music, `?lesson=2` picks the dance lesson, `?fx=low` turns off the glow and comic print passes, `?rot=90` forces the camera rotation.
 
 Built with Three.js for rendering, MediaPipe Pose Landmarker for body tracking (the model and runtime are bundled in `public/`), and the Web Audio API for all music and sound, which is synthesized live.
 

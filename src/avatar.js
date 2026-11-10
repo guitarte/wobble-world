@@ -285,7 +285,9 @@ export class Avatar {
     const j = rig.j, S = rig.S, sdt = Math.min(dt, 0.033);
     this.popV += ((1 - this.pop) * 140 - this.popV * 14) * sdt; this.pop += this.popV * sdt;
     const ps = Math.max(0.001, this.pop);
-    this.group.scale.setScalar(ps); this.group.position.set(j.hipC.x * (1 - ps), j.hipC.y * (1 - ps), 0);
+    // size: a game can shrink a hero where it stands (feet stay on the floor)
+    const sz = this.size ?? 1, sc = ps * sz;
+    this.group.scale.setScalar(sc); this.group.position.set(j.hipC.x * (1 - sc), rig.floorY * (1 - sz) + sz * j.hipC.y * (1 - ps), 0);
     this.happy = Math.max(0, this.happy - dt * 0.9); this.wow = Math.max(0, this.wow - dt); this.grit = Math.max(0, this.grit - dt); this.bounce = Math.max(0, this.bounce - dt * 3); this.flash = Math.max(0, this.flash - dt * 6);
     const inkW = 0.02 + 0.014 * S; this.ink.uniforms.uThick.value = inkW; this.inkThin.uniforms.uThick.value = inkW * 0.6;
     for (const m of this.allMats) m.uniforms.uFlash.value = this.flash * 0.8;
