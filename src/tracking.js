@@ -156,11 +156,11 @@ export class Rig {
   // movement away from the chest is stretched, so every button can be reached from one
   // spot without walking, and smaller players can still get to the top row.
   get reachUp() { return THREE.MathUtils.clamp((3.3 - this.j.chest.y) / (1.05 * this.S), 1, 3.6); }
-  cursorY(h) { const y = this.hands[h].y, sh = this.j.chest.y; return y <= sh ? y : Math.min(4.3, sh + (y - sh) * this.reachUp); }
+  cursorY(h) { const y = this.hands[h].y, sh = this.j.chest.y; return y <= sh ? y : Math.min(3.9, sh + (y - sh) * this.reachUp); }
   uncursorY(y) { const sh = this.j.chest.y; return y <= sh ? y : sh + (y - sh) / this.reachUp; }
   cursorX(h) {
     const c = this.j.chest.x, d = (this.hands[h].x - c) / this.S, a = Math.abs(d), o = Math.max(0, a - REACH_KNEE);
-    return THREE.MathUtils.clamp(c + Math.sign(d) * this.S * (REACH_SIDE * a + REACH_EXTRA * o * o), -7.8, 7.8);
+    return THREE.MathUtils.clamp(c + Math.sign(d) * this.S * (REACH_SIDE * a + REACH_EXTRA * o * o), -7.5, 7.5);
   }
   uncursorX(x) {
     const c = this.j.chest.x, X = Math.abs(x - c) / this.S; let a = X / REACH_SIDE;

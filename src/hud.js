@@ -79,7 +79,8 @@ export class HUD {
     }
   }
   clearButtons() { this.btnEl.innerHTML = ''; this.buttons = []; }
-  fire(b) { if (b.fired) return; b.fired = true; b.el.classList.add('fired'); this.app.audio.select(); b.onSelect(); }
+  // one choice at a time: once a button has gone off, the rest wait for the screen to change
+  fire(b) { if (this.buttons.some(x => x.fired)) return; b.fired = true; b.el.classList.add('fired'); this.app.audio.select(); b.onSelect(); }
   updateButtons(players, dt) {
     let n = 0; const show = this.buttons.some(b => !b.quiet);
     // On menus a hand is a stretched pointer. The quiet home button during a game uses the
@@ -98,10 +99,18 @@ export class HUD {
       t.style.transform = `translate(-50%, -50%) translate(calc(${Math.max(-7.4, Math.min(7.4, p.rig.j.hipC.x))} * var(--u)), calc(${-y} * var(--u))) rotate(${i % 2 ? 3 : -3}deg)`;
     });
     for (const c of this.cursors) { if (!c.dataset.live) c.classList.remove('on'); delete c.dataset.live; }
+    // nothing sits above a menu button, so a hand stretched higher than its top edge still counts
+    const m = 0.15, on = (p, h, b) => { const dy = p.rig.cursorY(h) - b.y; return Math.abs(cx(p, h) - b.x) < b.w / 2 + m && dy > -b.h / 2 - m && (dy < b.h / 2 + m || !b.quiet); };
+    const pointed = new Set();
+    for (const p of players) {
+      const mine = [0, 1].map(h => this.buttons.find(b => !b.fired && on(p, h, b)));
+      // two hands on two different buttons is a cheer or a star jump, not a choice
+      if (mine[0] && mine[1] && mine[0] !== mine[1]) continue;
+      for (const b of mine) if (b) pointed.add(b);
+    }
     for (const b of this.buttons) {
       if (b.fired) continue;
-      let hot = false; const m = 0.15;
-      for (const p of players) for (let h = 0; h < 2; h++) if (Math.abs(cx(p, h) - b.x) < b.w / 2 + m && Math.abs(p.rig.cursorY(h) - b.y) < b.h / 2 + m) hot = true;
+      let hot = pointed.has(b);
       // A hand that is already resting where a new button appears does not count until
       // it has moved away once, so one long reach cannot pick two things in a row.
       if (!b.armed) { if (hot) hot = false; else b.armed = true; }
