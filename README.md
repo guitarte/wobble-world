@@ -40,7 +40,7 @@ Arms always count towards the score. A knee lift, a lean or a knee bounce counts
 - **iPhone or iPad:** open the link in Safari, turn the device sideways, prop it up facing the room, and use Screen Mirroring (AirPlay) to show it on the TV. Add `?cam=back` to the link to use the rear camera.
 - Stand about 2 to 3 metres from the camera. Good, even lighting helps tracking a lot.
 - Wherever you stand, you are fitted to hero size and stood on the stage floor, so a small child at the back of the room has the same reach as a grown-up at the front, and a camera that is tilted or cuts off your feet still works. If someone is too close for the camera to see all of them, a tip on the menu asks them to step back.
-- Menus are body-controlled: point a hand at a button along the top of the screen and hold it there until the edge fills. Your hand works like a pointer, so you can reach every button from one spot. The home button in the top left corner leaves a game.
+- Menus are body-controlled: point a hand at a button along the top of the screen and hold it there until the edge fills. Your hand works like a pointer, so you can reach every button from one spot. Choose with one hand: two arms in the air are read as a cheer, not a choice. The home button in the top left corner leaves a game.
 - If the picture from the camera is sideways, it turns itself upright once it sees someone standing on the menu. The Rotate button on the camera preview does it by hand.
 
 No camera? Choose "Try with mouse or touch" on the start screen to steer a character with the pointer alongside computer players.
