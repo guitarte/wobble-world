@@ -36,18 +36,23 @@ export const ICONS = {
 
 export class HUD {
   constructor(app) {
-    this.app = app; this.buttons = []; this.chips = {}; this.cursors = [];
+    this.app = app; this.buttons = []; this.chips = {}; this.cursors = []; this.tagAt = { x: 0, y: 0 };
     this.scoresEl = $('scores'); this.bannerEl = $('banner'); this.countEl = $('count'); this.btnEl = $('buttons');
     this.curEl = $('cursors'); this.hintEl = $('hint'); this.titleEl = $('gtitle'); this.timerEl = $('timer'); this.statusEl = $('status');
     this.sideEl = $('strip'); this.howEl = $('howto'); this.resEl = $('results'); this.wipeEl = $('wipe'); this.topEl = $('top');
     for (let i = 0; i < 8; i++) { const c = el('div', 'cursor'); c.style.setProperty('--pc', PLAYER_CSS[i >> 1]); this.curEl.appendChild(c); this.cursors.push(c); }
-    this.tags = PLAYER_NAMES.map((n, i) => { const t = el('div', 'nametag', n); t.style.setProperty('--pc', PLAYER_CSS[i]); $('tags').appendChild(t); return t; });
+    this.tags = PLAYER_NAMES.map((n, i) => { const t = el('div', 'nametag', `<span>${n}</span><small></small>`); t.style.setProperty('--pc', PLAYER_CSS[i]); $('tags').appendChild(t); return t; });
   }
 
   // ----- top bar
   showTop(title) { this.topEl.classList.add('on'); this.titleEl.textContent = title; this.timerEl.textContent = ''; this.statusEl.innerHTML = ''; }
-  hideTop() { this.topEl.classList.remove('on'); this.scoresEl.innerHTML = ''; this.chips = {}; this.side(''); }
-  setTimer(sec) { const s = Math.max(0, Math.ceil(sec)); const txt = s; if (this.timerEl.textContent !== String(txt)) { this.timerEl.textContent = txt; this.timerEl.classList.toggle('low', s <= 10); } }
+  hideTop() { this.topEl.classList.remove('on'); this.scoresEl.innerHTML = ''; this.chips = {}; this.leader = undefined; this.side(''); }
+  setTimer(sec) {
+    const s = Math.max(0, Math.ceil(sec)); if (this.timerEl.textContent === String(s)) return;
+    const first = this.timerEl.textContent === ''; this.timerEl.textContent = s; this.timerEl.classList.toggle('low', s <= 10);
+    // the last ten seconds tick, and the clock jumps on each one
+    if (s <= 10 && s > 0 && !first && this.app.phase === 'play') { this.app.audio.clock(s); this.timerEl.classList.remove('tick'); void this.timerEl.offsetWidth; this.timerEl.classList.add('tick'); if (s <= 3) this.app.cam.punch(0.05); }
+  }
   setStatus(html) { if (this.statusEl.innerHTML !== html) this.statusEl.innerHTML = html; }
   setScore(slot, score, sub) {
     let c = this.chips[slot];
@@ -59,6 +64,11 @@ export class HUD {
     if (sub !== undefined) c.querySelector('em').textContent = sub;
   }
   removeScore(slot) { this.chips[slot]?.remove(); delete this.chips[slot]; }
+  // a player on a streak gets a chip that burns; the leader's chip wears a crown
+  setHot(slot, on) { this.chips[slot]?.classList.toggle('hot', on); }
+  setLeader(slot) { if (this.leader === slot) return; this.leader = slot; for (const k in this.chips) this.chips[k].classList.toggle('lead', +k === slot); }
+  // a line under a player's name on the scoreboard: the award they earned this round
+  setAward(slot, text) { const t = this.tags[slot], s = t.querySelector('small'); s.textContent = text || ''; t.classList.remove('awarded'); if (text) { void t.offsetWidth; t.classList.add('awarded'); } }
 
   // ----- a strip down the left edge: move pictures in the dance games
   side(html, color) { if (this.sideHtml !== html) { this.sideHtml = html; this.sideEl.innerHTML = html; this.sideOn = -1; } if (color) this.sideEl.style.setProperty('--ac', color); this.sideEl.classList.toggle('on', !!html); }
@@ -107,7 +117,7 @@ export class HUD {
   // a player's colour and name follow their hero
   identity(slot) {
     for (const h of [0, 1]) this.cursors[slot * 2 + h].style.setProperty('--pc', PLAYER_CSS[slot]);
-    this.tags[slot].textContent = PLAYER_NAMES[slot]; this.tags[slot].style.setProperty('--pc', PLAYER_CSS[slot]);
+    this.tags[slot].querySelector('span').textContent = PLAYER_NAMES[slot]; this.tags[slot].style.setProperty('--pc', PLAYER_CSS[slot]);
     const c = this.chips[slot]; if (c) { c.style.setProperty('--pc', PLAYER_CSS[slot]); c.querySelector('b').textContent = PLAYER_NAMES[slot]; }
   }
   updateButtons(players, dt) {
@@ -125,8 +135,9 @@ export class HUD {
     const ph = this.app.phase, tagsOn = ph === 'menu' || ph === 'genre' || ph === 'results';
     this.tags.forEach((t, i) => {
       const p = this.app.players.find(q => q.slot === i); t.classList.toggle('on', !!p && tagsOn); t.classList.toggle('win', ph === 'results' && !!this.app.winSlots?.includes(i)); if (!p) return;
-      const y = Math.max(-4.12, p.rig.floorY - 0.32);
-      t.style.transform = `translate(-50%, -50%) translate(calc(${Math.max(-7.4, Math.min(7.4, p.rig.j.hipC.x))} * var(--u)), calc(${-y} * var(--u))) rotate(${i % 2 ? 3 : -3}deg)`;
+      // through the camera, so a tag stays under its hero while the camera swings and pushes in
+      const a = this.app, at = a.cam.toStage(p.rig.j.hipC.x, p.rig.floorY - 0.32, 0, a.w / 2 / a.u, a.h / 2 / a.u, this.tagAt), y = Math.max(-4.12, at.y);
+      t.style.transform = `translate(-50%, -50%) translate(calc(${Math.max(-7.4, Math.min(7.4, at.x)).toFixed(3)} * var(--u)), calc(${(-y).toFixed(3)} * var(--u))) rotate(${i % 2 ? 3 : -3}deg)`;
     });
     for (const c of this.cursors) { if (!c.dataset.live) c.classList.remove('on'); delete c.dataset.live; }
     // nothing sits above a menu button, so a hand stretched higher than its top edge still counts
@@ -157,19 +168,23 @@ export class HUD {
 
   // ----- results
   showResults({ title, rows, stars, best, isBest, note }) {
-    const starHtml = [0, 1, 2].map(i => `<span class="star ${i < stars ? 'lit' : ''}" style="animation-delay:${0.5 + i * 0.25}s">★</span>`).join('');
+    const starHtml = [0, 1, 2].map(i => `<span class="star ${i < stars ? 'lit' : ''}">★</span>`).join('');
     // a short, wide card: it has to leave the heroes' faces in view below it
     const rank = rows.map(r => 1 + rows.filter(o => o.score > r.score).length); // equal scores share a place
     this.resEl.innerHTML = `<div class="res-card"><div class="res-head"><h2>${title}</h2><div class="stars">${starHtml}</div></div>
       <div class="rows ${rows.length < 2 ? 'one' : ''}">${rows.map((r, i) => `<div class="row ${rank[i] === 1 ? 'win' : ''}" style="--pc:${r.css};animation-delay:${0.2 + i * 0.15}s"><b>${r.badge ?? rank[i]}</b><i></i><span>${r.name}</span><strong data-to="${r.score}">0</strong></div>`).join('')}</div>
       <div class="res-foot"><div class="best ${isBest ? 'new' : ''}">${isBest ? 'New best score!' : (best ? `Best: ${best.toLocaleString()}` : '')}</div>${note ? `<div class="note">${note}</div>` : ''}</div></div>`;
     this.resEl.classList.add('on');
-    const t0 = performance.now();
+    const t0 = performance.now(), audio = this.app.audio, id = this.resId = (this.resId || 0) + 1; let ticks = 0, starN = 0;
     const tick = () => {
-      const k = Math.min(1, (performance.now() - t0 - 400) / 1200); if (!this.resEl.classList.contains('on')) return;
+      const el = performance.now() - t0, k = Math.min(1, (el - 400) / 1200); if (!this.resEl.classList.contains('on') || id !== this.resId) return;
       this.resEl.querySelectorAll('strong').forEach(s => { s.textContent = Math.round(+s.dataset.to * Math.max(0, 1 - Math.pow(1 - k, 3))).toLocaleString(); });
-      if (k < 1) requestAnimationFrame(tick);
-    }; tick();
+      // the count rattles upward, then each star lands with a thump
+      if (k > 0 && k < 1 && rows.some(r => r.score > 0) && el - 400 > ticks * 55) { ticks++; audio.tally(k); }
+      if (k >= 1 && !this.tallied) { this.tallied = true; if (rows.some(r => r.score > 0)) audio.ding(88); this.resEl.querySelectorAll('.row').forEach(r => r.classList.add('done')); }
+      while (starN < stars && el > 1700 + starN * 380) { audio.star(starN); this.resEl.querySelectorAll('.star')[starN].classList.add('slam'); this.app.cam.punch(0.06 + starN * 0.03); this.app.fx.shake(0.06 + starN * 0.04); starN++; }
+      if (k < 1 || starN < stars) requestAnimationFrame(tick);
+    }; this.tallied = false; tick();
   }
-  hideResults() { this.resEl.classList.remove('on'); }
+  hideResults() { this.resEl.classList.remove('on'); for (let i = 0; i < 4; i++) this.setAward(i, ''); }
 }

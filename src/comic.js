@@ -7,11 +7,11 @@ import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 export class ComicPass extends Pass {
   constructor() {
     super();
-    this.uniforms = { tDiffuse: { value: null }, uRes: { value: new THREE.Vector2(1280, 720) }, uDot: { value: 6 }, uSlip: { value: 1 }, uInk: { value: 1 }, uFlash: { value: 0 } };
+    this.uniforms = { tDiffuse: { value: null }, uRes: { value: new THREE.Vector2(1280, 720) }, uDot: { value: 6 }, uSlip: { value: 1 }, uInk: { value: 1 }, uFlash: { value: 0 }, uImpact: { value: 0 } };
     this.material = new THREE.ShaderMaterial({
       uniforms: this.uniforms, depthTest: false, depthWrite: false,
       vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
-      fragmentShader: `uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uDot, uSlip, uInk, uFlash; varying vec2 vUv;
+      fragmentShader: `uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uDot, uSlip, uInk, uFlash, uImpact; varying vec2 vUv;
         float luma(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
         void main(){
           vec2 px = 1.0 / uRes, d = vUv - 0.5; float r2 = dot(d, d);
@@ -35,6 +35,9 @@ export class ComicPass extends Pass {
           c = mix(c, vec3(0.07, 0.04, 0.15), ink * 0.82);
           c *= 1.0 - r2 * 0.42;
           c = mix(c, vec3(1.0), uFlash);
+          // impact frame: ink and paper only, with the dots left in the mid tones
+          float il = luma(c); vec3 two = mix(vec3(0.07, 0.04, 0.15), vec3(1.0, 0.97, 0.88), smoothstep(0.34, 0.4, il + (hd - 0.35) * 0.3));
+          c = mix(c, two, uImpact * 0.82);
           gl_FragColor = vec4(c, 1.0);
         }`,
     });

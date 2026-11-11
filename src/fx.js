@@ -88,6 +88,7 @@ class Swoosh {
 export class FX {
   constructor(scene, camera, popupLayer) {
     this.scene = scene; this.camera = camera; this.layer = popupLayer; this.shakeAmt = 0; this.stopT = 0; this.flashAmt = 0; this.clock = 0;
+    this.cam = null; this.impactAmt = 0; this.lastImpact = -9; this.sndX = 0; this.sndN = 0;
     this.glow = new Dots(scene, 1800, false); this.solid = new Dots(scene, 1400, true);
     const self = this; this.pmat = { uniforms: { uScale: { set value(v) { self.glow.mat.uniforms.uScale.value = v; self.solid.mat.uniforms.uScale.value = v; }, get value() { return self.glow.mat.uniforms.uScale.value; } } } };
     this.zoomEl = document.getElementById('zoom');
@@ -122,6 +123,7 @@ export class FX {
   spawn(x, y, z, vx, vy, vz, color, size, life, grav = 0, drag = 1.5) { this.glow.spawn(x, y, z, vx, vy, vz, color, size, life, grav, drag); }
   // A spray of sparks. Most are flat inked dots, a few glow.
   burst(p, o = {}) {
+    this.mark(p.x);
     const n = o.count ?? 24, sp = o.speed ?? 6, colors = o.colors || [o.color ?? 0xffffff], solid = o.solid ?? 0.6;
     for (let k = 0; k < n; k++) {
       const a = Math.random() * Math.PI * 2, e = (Math.random() - 0.5) * (o.flat ? 0.3 : 2), s = sp * (0.35 + Math.random() * 0.65), isSolid = Math.random() < solid;
@@ -133,12 +135,12 @@ export class FX {
     this.glow.spawn(p.x + (Math.random() - 0.5) * 0.15, p.y + (Math.random() - 0.5) * 0.15, (p.z ?? 0) + 0.3, (Math.random() - 0.5) * 0.6, (Math.random() - 0.5) * 0.6, 0, color, size, 0.45, -0.5, 1);
   }
   ring(p, color, r1 = 2, dur = 0.5, r0 = 0.2) {
-    const m = this.rings[this.ringI]; this.ringI = (this.ringI + 1) % MAXR;
+    const m = this.rings[this.ringI]; this.ringI = (this.ringI + 1) % MAXR; this.mark(p.x);
     m.position.set(p.x, p.y, (p.z ?? 0) + 0.2); m.material.color.set(color); m.visible = true; m.userData.t = 0; m.userData.dur = dur; m.userData.r0 = r0; m.userData.r1 = r1;
   }
   // The classic comic impact: a jagged starburst that snaps in and out.
   pow(p, color = 0xffd23f, size = 1) {
-    const g = this.bursts[this.burstI]; this.burstI = (this.burstI + 1) % MAXB;
+    const g = this.bursts[this.burstI]; this.burstI = (this.burstI + 1) % MAXB; this.mark(p.x);
     g.position.set(p.x, p.y, (p.z ?? 0) + 0.35); g.rotation.z = Math.random() * 6.28; g.userData.t = 0; g.userData.size = size; g.userData.mid.material.color.set(color); g.visible = true; g.scale.setScalar(size * 0.5);
   }
   // Brush-stroke trail for one hand. Call every frame with the hand position.
@@ -165,8 +167,20 @@ export class FX {
     for (let k = 0; k < 26; k++) { const a = k / 26 * Math.PI * 2, s = 6 + (k % 2) * 2.5; this.solid.spawn(x, y, -2, Math.cos(a) * s, Math.sin(a) * s, 0, k % 3 ? color : 0xffffff, 0.32, 1.1, 3.5, 1.6); }
     for (let k = 0; k < 16; k++) { const a = Math.random() * 6.28, s = 3 + Math.random() * 4; this.glow.spawn(x, y, -2, Math.cos(a) * s, Math.sin(a) * s, 0, color, 0.3, 0.9, 3, 1.6); }
   }
-  shake(a) { this.shakeAmt = Math.min(1.2, this.shakeAmt + a); }
-  hitstop(sec = 0.07) { this.stopT = Math.max(this.stopT, sec); }
+  // Remember where on the stage things are happening this frame, so the sounds made in
+  // the same frame can come from that side of the room (see AudioEngine.endFrame).
+  mark(x) { this.sndX += x; this.sndN++; }
+  takeMark() { const x = this.sndN ? this.sndX / this.sndN : null; this.sndX = 0; this.sndN = 0; return x; }
+  // big shakes also shove the camera toward the stage
+  shake(a) { this.shakeAmt = Math.min(1.2, this.shakeAmt + a); if (a >= 0.18) this.cam?.punch(a * 0.55); }
+  hitstop(sec = 0.07) { this.stopT = Math.max(this.stopT, sec); this.cam?.punch(sec * 3); if (sec >= 0.1) this.impact(); }
+  // An anime impact frame: for a blink, the whole picture drops to ink and paper.
+  // Kept rare so it stays special (and is never a flicker).
+  impact() { if (this.clock - this.lastImpact < 1.5) return; this.lastImpact = this.clock; this.impactAmt = 1; }
+  // a low puff of dust where feet land
+  dust(p, S = 1, color = 0xfff6dc) {
+    for (let k = 0; k < 9; k++) { const sg = k % 2 ? 1 : -1, sp = (1.2 + Math.random() * 2.2) * S; this.solid.spawn(p.x + sg * 0.1 * S, p.y + 0.06, (p.z ?? 0) + 0.3, sg * sp, 0.5 + Math.random() * 1.1, 0, color, (0.2 + Math.random() * 0.16) * S, 0.36 + Math.random() * 0.2, -0.6, 3.2); }
+  }
   flash(a = 0.18) { this.flashAmt = Math.max(this.flashAmt, Math.min(0.25, a)); }
   speedLines() { const z = this.zoomEl; if (!z) return; z.classList.remove('go'); void z.offsetWidth; z.classList.add('go'); }
 
@@ -181,7 +195,7 @@ export class FX {
   word(p, text, color = '#ffd23f', burst = '#fff') { const el = this.popup({ x: THREE.MathUtils.clamp(p.x, -6.6, 6.6), y: THREE.MathUtils.clamp(p.y, -3, 3.2), z: p.z }, text, color, 'word'); el.style.setProperty('--bc', burst); return el; }
 
   update(dt) {
-    this.clock += dt; this.stopT = Math.max(0, this.stopT - dt); this.flashAmt = Math.max(0, this.flashAmt - dt * 1.6);
+    this.clock += dt; this.stopT = Math.max(0, this.stopT - dt); this.flashAmt = Math.max(0, this.flashAmt - dt * 1.6); this.impactAmt = Math.max(0, this.impactAmt - dt * 11);
     this.glow.update(dt); this.solid.update(dt);
     let n = 0;
     for (let i = this.cData.length - 1; i >= 0; i--) {
