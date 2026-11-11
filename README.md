@@ -30,6 +30,17 @@ Fifteen games, spread over three pages of the menu. Point at "More games" to tur
 
 Every game ends with a double-points finale, and every game has its own original music.
 
+### Polish that runs through every game
+
+- **A living camera.** The stage never moves, so bodies and buttons always line up, but the camera swings gently around it as players move, which slides the world behind them and gives the picture depth. It punches in on big hits, nods on the beat in the dance games, swoops in as a game opens and eases toward the winners at the end.
+- **Heroes that react.** Their eyes follow whatever matters in the game (the nearest jelly, the ball, Coach Dot), they breathe, and they squash and kick up dust when they land a jump.
+- **On fire.** Keep scoring without a slip and a hero catches fire: a jagged power flare behind them, embers off their hands and a burning score chip. A penalty puts it out. It is only for show and does not change the score.
+- **Big hits.** The misprinted colour edges sit almost square and slip apart only when something hits hard, and the biggest moments get a one-frame ink-and-paper impact frame.
+- **The finish.** When a round ends everything stops dead for a breath with a whistle and a banner, then the scoreboard counts up, the stars slam in one at a time, and every player gets an award for something they did more of than anyone else (fastest hands, jumping bean, always on the move and so on). The leader wears a crown on their score chip during the round.
+- **Sound in stereo.** Effects come from the side of the room they happen on, the busiest ones never sound quite the same twice, the music is spread left and right and pumps with the kick drum, each world has its own quiet backdrop (birds, bubbles, wind), and the last ten seconds of a round tick.
+- **Pause.** With a camera, a round waits if everyone steps out of view and carries on when someone steps back in.
+- **Smoothness.** The picture's sharpness is adjusted while you play to hold a steady frame rate, in both directions, and the setting that suited the device is remembered for next time.
+
 ### Mirror mode
 
 With a camera, a fourth menu page appears: Mirror mode. The games on it (Balloon Bop, Paper Chop, Jelly Jam, Pow Blocks, Topple Tower and Freeze Frame) show the live camera picture of your real room and your real selves, with the game drawn on top, instead of the heroes and the cartoon world. Each player gets a ring in their colour around each hand, and everything in the game is sized to how big the players look on camera.
@@ -75,8 +86,10 @@ npm run dev      # local dev server
 npm run build    # production build in dist/
 ```
 
-Handy URL options: `?sim=2` starts with two pretend players (no camera), `?game=<id>` jumps straight into a game (`jelly`, `walls`, `comet`, `chop`, `pow`, `balloon`, `wing`, `laser`, `trot`, `bowl`, `lesson`, `battle`, `freeze`, `dot`, `topple`), `?ar=1` plays it in mirror mode, `?page=2` opens the menu on a given page, `?genre=pop|kpop|hiphop` picks the dance music, `?lesson=2` picks the dance lesson, `?fx=low` turns off the glow and comic print passes, `?rot=90` forces the camera rotation.
+Handy URL options: `?sim=2` starts with two pretend players (no camera), `?game=<id>` jumps straight into a game (`jelly`, `walls`, `comet`, `chop`, `pow`, `balloon`, `wing`, `laser`, `trot`, `bowl`, `lesson`, `battle`, `freeze`, `dot`, `topple`), `?ar=1` plays it in mirror mode, `?page=2` opens the menu on a given page, `?genre=pop|kpop|hiphop` picks the dance music, `?lesson=2` picks the dance lesson, `?fx=low` turns off the glow and comic print passes, `?rot=90` forces the camera rotation, `?fps` shows the frame rate and the current sharpness at the bottom of the screen, `?pr=1` fixes the sharpness.
 
 Built with Three.js for rendering, MediaPipe Pose Landmarker for body tracking (the model and runtime are bundled in `public/`), and the Web Audio API for all music and sound, which is synthesized live.
+
+Testing without a camera: with the preview server running (`npm run build && npx vite preview --port 4173 --strictPort`), `node tools/play.cjs <game>` fast-forwards a whole game with pretend players and prints scores and errors, `node tools/until.cjs` fast-forwards to a chosen moment and takes a picture, and `node tools/listen.cjs` starts the sound and reports loudness, stereo spread and peaks.
 
 Pushing to `main` builds and publishes the site with GitHub Pages.

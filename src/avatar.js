@@ -21,6 +21,12 @@ const G = {
   star: (() => { const s = new THREE.Shape(); for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2 + Math.PI / 2, r = i % 2 ? 0.45 : 1; s[i ? 'lineTo' : 'moveTo'](Math.cos(a) * r, Math.sin(a) * r); } return new THREE.ExtrudeGeometry(s, { depth: 0.3, bevelEnabled: false }); })(),
 };
 
+const AURA = (() => {
+  const s = new THREE.Shape(), n = 13;
+  for (let i = 0; i < n * 2; i++) { const a = i / (n * 2) * Math.PI * 2 - Math.PI / 2, up = Math.max(0, Math.sin(a)), r = i % 2 ? 0.58 + up * 0.1 : 0.82 + ((i * 5) % 7) * 0.035 + up * 0.22; s[i ? 'lineTo' : 'moveTo'](Math.cos(a) * r, Math.sin(a) * r); }
+  return new THREE.ShapeGeometry(s);
+})();
+
 // A hero is plain data: colours, a hair style, an emblem and optional extras.
 //   hairStyle: spikes | tails | quiff | flow | afro | mohawk | bob | pony | buns | cap
 //   extra: scarf | cape | none      long: long sleeves      flare: flared cuffs and trousers
@@ -40,11 +46,21 @@ export const EMBLEMS = ['flame', 'wave', 'bolt', 'star', 'paw', 'claw', 'moon', 
 const css = (hex) => '#' + new THREE.Color(hex).getHexString();
 
 // ------------------------------------------------------------------ faces
-const FACE_CACHE = new Map();
+const FACE_CACHE = new Map(), EYE_CACHE = new Map(), MASK_CACHE = new Map();
+const EYE_Y = 124, EYE_DX = 53;
+const eyeShape = (expr) => (expr === 'wow' ? 'wide' : expr === 'blink' || expr === 'happy' ? 'shut' : 'open');
+const canvasTex = (c) => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; };
+function eyePaths(g, cx, sg, wide) { // the outline and the heavy upper lash, shared by the face and the mask
+  const ry = wide ? 38 : 34, rx = 26;
+  g.lineWidth = 4; g.beginPath(); g.ellipse(cx, EYE_Y, rx, ry, 0, 0, 7); g.stroke();
+  g.lineWidth = 10; g.beginPath(); g.ellipse(cx, EYE_Y, rx + 1, ry + 1, 0, Math.PI * 1.06, Math.PI * 1.94); g.stroke();
+  g.lineWidth = 7; g.beginPath(); g.moveTo(cx + sg * 24, EYE_Y - 16); g.lineTo(cx + sg * 37, EYE_Y - 25); g.stroke();
+}
+// Everything on the face except the irises, which are a layer of their own so the eyes can look around.
 function faceTexture(hero, expr) {
-  const key = expr + '|' + hero.accent + '|' + hero.hair; if (FACE_CACHE.has(key)) return FACE_CACHE.get(key);
+  const key = expr + '|' + hero.hair; if (FACE_CACHE.has(key)) return FACE_CACHE.get(key);
   const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
-  const ink = '#1a1030', iris = css(hero.accent === 0xffd23f ? 0xff8a1f : hero.accent), brow = new THREE.Color(hero.hair).getHSL({}).l > 0.75 ? '#5b4a9a' : css(tint(hero.hair, 0x000000, 0.35));
+  const ink = '#1a1030', brow = new THREE.Color(hero.hair).getHSL({}).l > 0.75 ? '#5b4a9a' : css(tint(hero.hair, 0x000000, 0.35));
   g.lineCap = 'round'; g.lineJoin = 'round';
   // blush
   for (const sg of [-1, 1]) {
@@ -52,25 +68,18 @@ function faceTexture(hero, expr) {
     g.strokeStyle = 'rgba(214,50,90,0.6)'; g.lineWidth = 3; for (let k = -1; k <= 1; k++) { g.beginPath(); g.moveTo(128 + sg * 86 + k * 9 - 4, 178); g.lineTo(128 + sg * 86 + k * 9 + 4, 166); g.stroke(); }
   }
   for (const sg of [-1, 1]) {
-    const cx = 128 + sg * 53, cy = 124;
+    const cx = 128 + sg * EYE_DX, cy = EYE_Y;
     if (expr === 'blink' || expr === 'happy') {
       g.strokeStyle = ink; g.lineWidth = 9; g.beginPath();
       if (expr === 'happy') { g.moveTo(cx - 26, cy + 12); g.quadraticCurveTo(cx, cy - 26, cx + 26, cy + 12); }
       else { g.moveTo(cx - 26, cy + 2); g.quadraticCurveTo(cx, cy + 18, cx + 26, cy + 2); }
       g.stroke();
     } else {
-      const wide = expr === 'wow', ry = wide ? 38 : 34, rx = 26;
-      g.fillStyle = '#fff'; g.beginPath(); g.ellipse(cx, cy, rx, ry, 0, 0, 7); g.fill();
-      g.save(); g.clip();
-      const gr = g.createLinearGradient(0, cy - 26, 0, cy + 30); gr.addColorStop(0, '#1a1030'); gr.addColorStop(0.5, iris); gr.addColorStop(1, '#ffffff');
-      g.fillStyle = gr; g.beginPath(); g.ellipse(cx, cy + 5, wide ? 15 : 20, wide ? 20 : 28, 0, 0, 7); g.fill();
-      g.fillStyle = ink; g.beginPath(); g.ellipse(cx, cy + 3, wide ? 6 : 9, wide ? 8 : 13, 0, 0, 7); g.fill();
-      g.fillStyle = '#fff'; g.beginPath(); g.arc(cx - 9, cy - 12, 8.5, 0, 7); g.fill(); g.beginPath(); g.arc(cx + 9, cy + 15, 4.2, 0, 7); g.fill();
-      g.restore();
-      g.strokeStyle = ink; g.lineWidth = 4; g.beginPath(); g.ellipse(cx, cy, rx, ry, 0, 0, 7); g.stroke();
-      // heavy upper lash with a flick at the outer corner
-      g.lineWidth = 10; g.beginPath(); g.ellipse(cx, cy, rx + 1, ry + 1, 0, Math.PI * 1.06, Math.PI * 1.94); g.stroke();
-      g.lineWidth = 7; g.beginPath(); g.moveTo(cx + sg * 24, cy - 16); g.lineTo(cx + sg * 37, cy - 25); g.stroke();
+      const wide = expr === 'wow';
+      g.fillStyle = '#fff'; g.beginPath(); g.ellipse(cx, cy, 26, wide ? 38 : 34, 0, 0, 7); g.fill();
+      // the lid's shadow across the top of the eye
+      g.save(); g.clip(); g.fillStyle = 'rgba(70,50,130,0.22)'; g.beginPath(); g.ellipse(cx, cy - 30, 34, 22, 0, 0, 7); g.fill(); g.restore();
+      g.strokeStyle = ink; eyePaths(g, cx, sg, wide);
     }
     // eyebrows
     g.strokeStyle = brow; g.lineWidth = 9; g.beginPath();
@@ -90,7 +99,48 @@ function faceTexture(hero, expr) {
   } else if (expr === 'wow') { g.fillStyle = '#7a1838'; g.beginPath(); g.ellipse(128, 192, 11, 14, 0, 0, 7); g.fill(); g.stroke(); }
   else if (expr === 'grit') { g.fillStyle = '#fff'; g.beginPath(); g.moveTo(100, 178); g.quadraticCurveTo(128, 184, 158, 174); g.quadraticCurveTo(152, 200, 128, 200); g.quadraticCurveTo(106, 200, 100, 178); g.closePath(); g.fill(); g.stroke(); g.lineWidth = 2.5; g.beginPath(); g.moveTo(104, 189); g.lineTo(154, 187); g.stroke(); }
   else { g.beginPath(); g.moveTo(108, 180); g.quadraticCurveTo(130, 198, 152, 178); g.stroke(); g.lineWidth = 3; g.beginPath(); g.moveTo(152, 172); g.lineTo(156, 180); g.stroke(); }
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; FACE_CACHE.set(key, t); return t;
+  const t = canvasTex(c); FACE_CACHE.set(key, t); return t;
+}
+// The irises on their own: big manga eyes with a dark top, the hero's colour and two highlights.
+function eyeTexture(hero, shape) {
+  const key = shape + '|' + hero.accent; if (EYE_CACHE.has(key)) return EYE_CACHE.get(key);
+  const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
+  if (shape !== 'shut') {
+    const wide = shape === 'wide', iris = css(hero.accent === 0xffd23f ? 0xff8a1f : hero.accent);
+    for (const sg of [-1, 1]) {
+      const cx = 128 + sg * EYE_DX, cy = EYE_Y;
+      const gr = g.createLinearGradient(0, cy - 26, 0, cy + 30); gr.addColorStop(0, '#1a1030'); gr.addColorStop(0.5, iris); gr.addColorStop(1, '#ffffff');
+      g.fillStyle = gr; g.beginPath(); g.ellipse(cx, cy + 5, wide ? 15 : 20, wide ? 20 : 28, 0, 0, 7); g.fill();
+      g.strokeStyle = 'rgba(26,16,48,0.85)'; g.lineWidth = 2.5; g.stroke();
+      g.fillStyle = '#1a1030'; g.beginPath(); g.ellipse(cx, cy + 3, wide ? 6 : 9, wide ? 8 : 13, 0, 0, 7); g.fill();
+      g.fillStyle = '#fff'; g.beginPath(); g.arc(cx - 9, cy - 12, wide ? 6 : 8.5, 0, 7); g.fill(); g.beginPath(); g.arc(cx + 9, cy + 15, 4.2, 0, 7); g.fill();
+    }
+  }
+  const t = canvasTex(c); EYE_CACHE.set(key, t); return t;
+}
+// Where an iris may show: inside the eye, and never over the lash line.
+function eyeMask(shape) {
+  if (MASK_CACHE.has(shape)) return MASK_CACHE.get(shape);
+  const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
+  g.fillStyle = '#000'; g.fillRect(0, 0, 256, 256);
+  if (shape !== 'shut') for (const sg of [-1, 1]) {
+    const cx = 128 + sg * EYE_DX; g.fillStyle = '#fff'; g.beginPath(); g.ellipse(cx, EYE_Y, 26, shape === 'wide' ? 38 : 34, 0, 0, 7); g.fill();
+    g.strokeStyle = '#000'; g.lineCap = 'round'; eyePaths(g, cx, sg, shape === 'wide');
+  }
+  const t = new THREE.CanvasTexture(c); MASK_CACHE.set(shape, t); return t;
+}
+function faceMat(hero) {
+  return new THREE.ShaderMaterial({
+    uniforms: { map: { value: faceTexture(hero, 'neutral') }, eyes: { value: eyeTexture(hero, 'open') }, mask: { value: eyeMask('open') }, uLook: { value: new THREE.Vector2() } },
+    transparent: true, depthWrite: false,
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `uniform sampler2D map, eyes, mask; uniform vec2 uLook; varying vec2 vUv;
+      void main(){ vec4 b = texture2D(map, vUv); vec4 e = texture2D(eyes, vUv - uLook); float m = texture2D(mask, vUv).r;
+        gl_FragColor = vec4(mix(b.rgb, e.rgb, e.a * m), b.a);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`,
+  });
 }
 const EMBLEM_CACHE = new Map();
 function emblemTexture(kind, color) {
@@ -183,7 +233,7 @@ export class Avatar {
     this.head = new THREE.Group(); this.group.add(this.head);
     const skull = mk(G.sphere, M.skin, this.head); skull.scale.set(1, 1.06, 0.97);
     for (const sg of [-1, 1]) { const e = mk(G.sphere, M.skin, this.head); e.scale.set(0.12, 0.2, 0.16); e.position.set(sg * 0.98, -0.08, 0.02); }
-    this.faceMat = new THREE.MeshBasicMaterial({ map: faceTexture(H, 'neutral'), transparent: true, depthWrite: false });
+    this.faceMat = faceMat(H);
     this.face = new THREE.Mesh(G.face, this.faceMat); this.face.renderOrder = 2; this.head.add(this.face);
     this.ribbons = []; this.wobblers = [];
     this.buildHair(H.hairStyle, mk);
@@ -191,6 +241,11 @@ export class Avatar {
     this.shadow = new THREE.Mesh(G.disc, new THREE.MeshBasicMaterial({ color: 0x140c2a, transparent: true, opacity: 0.3, depthWrite: false })); this.shadow.rotation.x = -Math.PI / 2; this.shadow.renderOrder = -1; this.group.add(this.shadow);
     this.pop = 0; this.popV = 0; this.blinkT = 2; this.happy = 0; this.wow = 0; this.grit = 0; this.bounce = 0; this.spring = 0; this.springV = 0; this.lastHeadX = 0; this.flash = 0; this.expr = 'neutral';
     this.R = 0.4; this.yaw = 0; this.roll = 0;
+    this.look = new THREE.Vector2(); this.glance = new THREE.Vector2(); this.glanceT = 1; this.breath = Math.random() * 6; this.landQ = 0;
+    // the power aura: a jagged flare behind a hero who is on a streak
+    this.heat = 0; this.aura = new THREE.Group(); this.aura.visible = false; this.group.add(this.aura);
+    const flare = (color, sc, z, op) => { const m = new THREE.Mesh(AURA, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op, depthWrite: false })); m.scale.setScalar(sc); m.position.z = z; this.aura.add(m); return m; };
+    this.auraParts = [flare(INK, 1.07, -0.02, 0.9), flare(tint(H.accent, 0xffd23f, 0.35), 1, -0.01, 0.92), flare(0xfff3b0, 0.7, 0, 0.95)];
   }
 
   spike(mk, mat, base, dir, len, rad, flat = 1) {
@@ -270,6 +325,7 @@ export class Avatar {
   }
 
   cheer(amount = 1) { this.happy = Math.max(this.happy, amount); this.bounce = 1; }
+  land(amount = 1) { this.landQ = Math.max(this.landQ, amount); }
   ouch() { this.wow = 1.1; this.flash = 1; }
   focus(sec = 1) { this.grit = sec; }
   popIn() { this.pop = 0; this.popV = 0; for (const r of this.ribbons) r.fresh = true; }
@@ -281,23 +337,27 @@ export class Avatar {
   }
   ball(mesh, p, r, z) { mesh.position.set(p.x, p.y, z); mesh.scale.setScalar(r); }
 
-  update(rig, dt, t) {
+  update(rig, dt, t, lookAt = null) {
     const j = rig.j, S = rig.S, sdt = Math.min(dt, 0.033);
     this.popV += ((1 - this.pop) * 140 - this.popV * 14) * sdt; this.pop += this.popV * sdt;
     const ps = Math.max(0.001, this.pop);
     // size: a game can shrink a hero where it stands (feet stay on the floor)
     const sz = this.size ?? 1, sc = ps * sz;
-    this.group.scale.setScalar(sc); this.group.position.set(j.hipC.x * (1 - sc), rig.floorY * (1 - sz) + sz * j.hipC.y * (1 - ps), 0);
+    // landing from a jump squashes the whole hero onto the floor for a moment
+    this.landQ = Math.max(0, this.landQ - dt * 5.5); const lq = Math.sin(Math.min(1, this.landQ) * Math.PI), lx = 1 + lq * 0.07, ly = 1 - lq * 0.1;
+    this.group.scale.set(sc * lx, sc * ly, sc);
+    this.group.position.set(lx * j.hipC.x * (1 - sc) + j.hipC.x * (1 - lx), ly * (rig.floorY * (1 - sz) + sz * j.hipC.y * (1 - ps)) + rig.floorY * (1 - ly), 0);
     this.happy = Math.max(0, this.happy - dt * 0.9); this.wow = Math.max(0, this.wow - dt); this.grit = Math.max(0, this.grit - dt); this.bounce = Math.max(0, this.bounce - dt * 3); this.flash = Math.max(0, this.flash - dt * 6);
     const inkW = 0.02 + 0.014 * S; this.ink.uniforms.uThick.value = inkW; this.inkThin.uniforms.uThick.value = inkW * 0.6;
     for (const m of this.allMats) m.uniforms.uFlash.value = this.flash * 0.8;
     const squash = 1 + Math.sin(this.bounce * Math.PI) * 0.1;
+    this.breath += dt * (1.7 + Math.min(2.5, rig.energy) * 1.4); const br = 1 + Math.sin(this.breath) * 0.02; // breathing, faster after a workout
 
     // torso
     tA.subVectors(j.chest, j.hipC); const tl = tA.length() || 1e-3; tA.multiplyScalar(1 / tl);
     const shW = Math.max(j.shL.distanceTo(j.shR), 0.6 * S), hw = shW * 0.52, dp = shW * 0.34;
     const q = this.torso.quaternion.setFromUnitVectors(UP, tA);
-    this.torso.position.copy(j.hipC).addScaledVector(tA, tl * 0.03); this.torso.scale.set(hw * squash, tl * 0.94 / squash, dp);
+    this.torso.position.copy(j.hipC).addScaledVector(tA, tl * 0.03); this.torso.scale.set(hw * squash * br, tl * 0.94 / squash, dp * (2 * br - 1));
     this.hem.position.copy(j.hipC).addScaledVector(tA, tl * 0.07); this.hem.quaternion.copy(q); this.hem.scale.set(hw * 0.74, 0.12 * S, dp * 0.76);
     this.pelvis.position.copy(j.hipC).addScaledVector(tA, -0.05 * S); this.pelvis.quaternion.copy(q); this.pelvis.scale.set(hw * 0.74, 0.27 * S, dp * 0.72);
     this.emblem.position.copy(j.hipC).addScaledVector(tA, tl * 0.62); this.emblem.position.z = dp * 0.93 + 0.01; this.emblem.quaternion.copy(q); this.emblem.scale.setScalar(0.2 * S); this.emblem.rotateX(-0.12);
@@ -352,7 +412,22 @@ export class Avatar {
     // face: blink, and react
     this.blinkT -= dt; if (this.blinkT < -0.11) this.blinkT = 1.4 + Math.random() * 3.2;
     const expr = this.wow > 0 ? 'wow' : this.happy > 0.25 ? 'happy' : this.grit > 0 ? 'grit' : this.blinkT < 0 ? 'blink' : 'neutral';
-    if (expr !== this.expr) { this.expr = expr; this.faceMat.map = faceTexture(this.hero, expr); }
+    if (expr !== this.expr) { this.expr = expr; const fu = this.faceMat.uniforms, sh = eyeShape(expr); fu.map.value = faceTexture(this.hero, expr); fu.eyes.value = eyeTexture(this.hero, sh); fu.mask.value = eyeMask(sh); }
+    // eyes: follow whatever the game says is worth watching, or wander a little
+    this.glanceT -= dt; if (this.glanceT < 0) { this.glanceT = 0.9 + Math.random() * 2.6; if (Math.random() < 0.45) this.glance.set(0, 0); else this.glance.set((Math.random() - 0.5) * 1.6, (Math.random() - 0.5) * 0.9); }
+    let gx = this.glance.x, gy = this.glance.y;
+    if (lookAt) { const dx = lookAt.x - hx, dy = lookAt.y - hy, d = Math.hypot(dx, dy) || 1, far = Math.min(1, d / (2.2 * S)); gx = dx / d * far; gy = dy / d * far; }
+    const ek = Math.min(1, dt * 16); this.look.x += (gx * 0.034 - this.look.x) * ek; this.look.y += (gy * 0.027 - this.look.y) * ek;
+    this.faceMat.uniforms.uLook.value.set(this.look.x - yaw * 0.012, this.look.y);
+
+    // power aura, drawn on twos so it crackles like ink
+    const hot = this.heat > 0.02; this.aura.visible = hot;
+    if (hot) {
+      const f = Math.floor(t * 11), wob = ((f * 7) % 5) / 5, k = Math.min(1, this.heat);
+      this.aura.position.set((j.chest.x + j.hipC.x) / 2, (j.chest.y + j.hipC.y) / 2 + 0.25 * S, -0.5 * S);
+      this.aura.scale.set(S * 1.3 * k * (1 + wob * 0.08), S * 2.2 * k * (1 + (1 - wob) * 0.1), 1); this.aura.rotation.z = (f % 2 ? 0.05 : -0.05) + roll * 0.3;
+      this.auraParts[2].rotation.z = f % 3 * 0.12; this.auraParts[1].rotation.z = -(f % 2) * 0.09;
+    }
 
     // flat comic shadow
     const lift = Math.max(0, Math.min(j.anL.y, j.anR.y) - rig.floorY);
@@ -360,5 +435,5 @@ export class Avatar {
     this.shadow.position.set(j.hipC.x, rig.floorY + 0.03, 0.15); this.shadow.scale.set(sw, sw * 0.62, 1); this.shadow.material.opacity = 0.34 / (1 + lift * 0.5);
   }
 
-  dispose() { this.group.removeFromParent(); for (const m of this.allMats) m.dispose(); this.ink.dispose(); this.inkThin.dispose(); for (const r of this.ribbons) { r.mesh.geometry.dispose(); r.mesh.material.dispose(); } }
+  dispose() { this.group.removeFromParent(); for (const m of this.allMats) m.dispose(); this.ink.dispose(); this.inkThin.dispose(); this.faceMat.dispose(); for (const m of this.auraParts) m.material.dispose(); for (const r of this.ribbons) { r.mesh.geometry.dispose(); r.mesh.material.dispose(); } }
 }

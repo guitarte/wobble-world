@@ -233,8 +233,8 @@ export class DanceClass extends DanceBase {
         const s = p.slot, m = this.best[s]; this.best[s] = 0; const at = { x: p.j.head.x, y: p.j.head.y + 1.3 };
         if (m >= 0.78) { this.streak[s]++; this.app.addScore(s, 100, at, { text: 'Perfect!', color: '#ffd23f', cls: 'big', sub: this.streak[s] >= 3 ? this.streak[s] + ' streak' : '', cheer: 0.9 }); fx.ring(p.j.chest, 0xffd23f, 2.6, 0.4); fx.pow(p.j.haL, 0xffd23f, 0.7); fx.pow(p.j.haR, 0xffd23f, 0.7); fx.burst(p.j.haL, { count: 8, color: 0xffd23f, speed: 5 }); fx.burst(p.j.haR, { count: 8, color: 0xffd23f, speed: 5 });
           if (this.streak[s] % 5 === 0) { fx.word({ x: p.j.head.x, y: p.j.head.y + 2.1 }, this.streak[s] >= 10 ? 'ON FIRE!' : 'SO SMOOTH!', '#fff', p.css); audio.cheer(0.6); } if (s === players[0].slot) audio.perfect(); }
-        else if (m >= 0.58) { this.streak[s]++; this.app.addScore(s, 60, at, { text: 'Great!', color: '#7fe3ff', sub: this.streak[s] >= 3 ? this.streak[s] + ' streak' : '' }); if (s === players[0].slot) audio.good(); }
-        else if (m >= 0.4) { this.streak[s] = 0; this.app.addScore(s, 30, at, { text: 'Good', color: '#fff', cls: 'small', sub: '' }); }
+        else if (m >= 0.58) { this.streak[s]++; this.app.addScore(s, 60, at, { text: 'Great!', color: '#7fe3ff', sub: this.streak[s] >= 3 ? this.streak[s] + ' streak' : '', heat: 0.07 }); if (s === players[0].slot) audio.good(); }
+        else if (m >= 0.4) { this.streak[s] = 0; this.app.addScore(s, 30, at, { text: 'Good', color: '#fff', cls: 'small', sub: '', heat: 0 }); }
         else { this.streak[s] = 0; fx.popup(at, 'Keep going', 'rgba(255,255,255,.7)', 'small'); this.app.hud.setScore(s, this.app.scores[s], ''); }
       }
     }
