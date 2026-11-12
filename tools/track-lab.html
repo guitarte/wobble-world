@@ -9,6 +9,7 @@
 import { Tracker } from '/src/tracking.js';
 const qs = new URLSearchParams(location.search), tracker = new Tracker();
 tracker.classic = qs.has('classic'); // the older whole-picture tracking, to compare against
+tracker.shared = qs.has('shared');   // the phone way: one pose model for all the close-ups
 await tracker.loadModel(new URL('/', location.href).href, qs.get('gpu') === '0' ? 'CPU' : undefined);
 if (tracker.follow) tracker.follow.budget = 1e9; // every follower looks at every frame, however slow this machine is
 const src = document.createElement('canvas'), sg = src.getContext('2d');
@@ -18,6 +19,7 @@ window.lab = {
   tracker,
   // frames: image URLs. Returns, per frame, who is in play and where.
   async run(frames, { fps = 30, draw = -1, opts = {}, fopts = {} } = {}) {
+    tracker.rotation = 0; tracker.sideN = 0; tracker.upSize = 0; // every clip starts unturned
     Object.assign(tracker, opts); if (tracker.follow) Object.assign(tracker.follow, fopts);
     for (let i = 0; i < 4; i++) tracker.players[i] = null;
     tracker.cands = []; tracker.follow?.reset(window.__t || 0);
@@ -33,14 +35,16 @@ window.lab = {
       now += 1000 / fps;
       const t0 = performance.now(); tracker.update(now, 1 / fps); ms += performance.now() - t0;
       log.push(tracker.players.map(p => p ? [+(p.cx / tracker.stageW).toFixed(3), +(p.cy / tracker.stageH).toFixed(3)] : null));
+      window.probe?.(f, tracker); // for looking into one clip by hand
       if (f === draw) this.draw();
     }
     window.__t = now;
-    return { log, events, ms: ms / frames.length };
+    return { log, events, ms: ms / frames.length, turned: tracker.rotation };
   },
   draw() {
     const c = document.getElementById('view'), g = c.getContext('2d'), W = tracker.stageW, H = tracker.stageH;
-    c.width = src.width; c.height = src.height; g.drawImage(src, 0, 0);
+    const pic = tracker.canvas?.width ? tracker.canvas : src; // the upright picture the tracker works from
+    c.width = pic.width; c.height = pic.height; g.drawImage(pic, 0, 0);
     const X = (x) => (0.5 - x / W) * c.width, Y = (y) => (0.5 - y / H) * c.height;
     const BONES = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [24, 26], [26, 28], [0, 11], [0, 12]];
     tracker.players.forEach((p, i) => {
