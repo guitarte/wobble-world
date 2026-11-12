@@ -1,0 +1,54 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Tracking lab</title>
+<!-- Runs the real tracker over recorded frames, one frame per pretend 1/30 s, so results do
+     not depend on how fast the machine is. Driven by tools/track-test.cjs. -->
+<body style="background:#222;color:#eee;font:14px sans-serif">
+<canvas id="view" width="1280" height="720" style="width:960px"></canvas>
+<script type="module">
+import { Tracker } from '/src/tracking.js';
+const qs = new URLSearchParams(location.search), tracker = new Tracker();
+tracker.classic = qs.has('classic'); // the older whole-picture tracking, to compare against
+await tracker.loadModel(new URL('/', location.href).href, qs.get('gpu') === '0' ? 'CPU' : undefined);
+if (tracker.follow) tracker.follow.budget = 1e9; // every follower looks at every frame, however slow this machine is
+const src = document.createElement('canvas'), sg = src.getContext('2d');
+const load = (url) => new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = url; });
+const COLORS = ['#ff4d6d', '#19c9c0', '#ffc21a', '#9a5bff'];
+window.lab = {
+  tracker,
+  // frames: image URLs. Returns, per frame, who is in play and where.
+  async run(frames, { fps = 30, draw = -1, opts = {}, fopts = {} } = {}) {
+    Object.assign(tracker, opts); if (tracker.follow) Object.assign(tracker.follow, fopts);
+    for (let i = 0; i < 4; i++) tracker.players[i] = null;
+    tracker.cands = []; tracker.follow?.reset(window.__t || 0);
+    const log = [], events = []; let now = (window.__t || 1000) + 5000, ms = 0;
+    tracker.onJoin = (p) => events.push({ f: log.length, join: p.slot });
+    tracker.onLeave = (p) => events.push({ f: log.length, leave: p.slot });
+    tracker.fit = false; tracker.mode = 'camera';
+    for (let f = 0; f < frames.length; f++) {
+      const img = await load(frames[f]);
+      if (src.width !== img.width) { src.width = img.width; src.height = img.height; }
+      sg.drawImage(img, 0, 0);
+      tracker.video = { readyState: 4, currentTime: f + 1, videoWidth: src.width, videoHeight: src.height, el: src };
+      now += 1000 / fps;
+      const t0 = performance.now(); tracker.update(now, 1 / fps); ms += performance.now() - t0;
+      log.push(tracker.players.map(p => p ? [+(p.cx / tracker.stageW).toFixed(3), +(p.cy / tracker.stageH).toFixed(3)] : null));
+      if (f === draw) this.draw();
+    }
+    window.__t = now;
+    return { log, events, ms: ms / frames.length };
+  },
+  draw() {
+    const c = document.getElementById('view'), g = c.getContext('2d'), W = tracker.stageW, H = tracker.stageH;
+    c.width = src.width; c.height = src.height; g.drawImage(src, 0, 0);
+    const X = (x) => (0.5 - x / W) * c.width, Y = (y) => (0.5 - y / H) * c.height;
+    const BONES = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [24, 26], [26, 28], [0, 11], [0, 12]];
+    tracker.players.forEach((p, i) => {
+      if (!p) return; g.strokeStyle = g.fillStyle = COLORS[i]; g.lineWidth = 5;
+      for (const [a, b] of BONES) { const A = p.target[a], B = p.target[b]; if (A.v < 0.3 || B.v < 0.3) continue; g.beginPath(); g.moveTo(X(A.x), Y(A.y)); g.lineTo(X(B.x), Y(B.y)); g.stroke(); }
+      g.font = 'bold 40px sans-serif'; g.fillText('P' + (i + 1), X(p.target[0].x) - 24, Y(p.target[0].y) - 40);
+    });
+  },
+};
+window.labReady = true;
+</script>

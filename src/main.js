@@ -116,12 +116,24 @@ class App {
     const msg = $('boot-msg'), btn = $('b-cam'); btn.disabled = true; this.audio.init();
     try {
       msg.textContent = 'Asking for the camera…';
-      await this.tracker.startCamera(qs.get('cam') === 'back' ? 'environment' : 'user');
+      let saved = null; try { saved = localStorage.getItem('ww-cam'); } catch (e) { /* fine */ }
+      // Phones and tablets keep the whole-picture tracking for now: a follower for every
+      // player takes a few hundred megabytes, which has not been tried on them yet.
+      const handheld = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+      this.tracker.classic = qs.has('track') ? qs.get('track') === 'classic' : handheld;
+      await this.tracker.startCamera(qs.get('cam') === 'back' ? 'environment' : 'user', qs.has('cam') ? null : saved);
       msg.textContent = 'Loading body tracking…';
-      await this.tracker.loadModel(new URL('.', document.baseURI).href);
+      await this.tracker.loadModel(new URL('.', document.baseURI).href, qs.has('cpu') ? 'CPU' : undefined);
       $('pip').prepend(this.tracker.canvas);
       if (qs.has('rot')) this.tracker.setRotation(+qs.get('rot'));
       $('b-rot').addEventListener('click', () => { this.tracker.setRotation(this.tracker.rotation + 90); this.manualRot = true; });
+      // more than one camera on this machine: offer to switch between them
+      this.tracker.cameras().then((cams) => { if (cams.length > 1) $('b-cams').hidden = false; });
+      $('b-cams').addEventListener('click', async () => {
+        const b = $('b-cams'); if (b.disabled) return; b.disabled = true;
+        const name = await this.tracker.nextCamera().catch(() => null); b.disabled = false;
+        if (name) { this.pipAr = 0; this.hud.banner(name, '#fff', 1.6, 'Camera switched', 'low'); }
+      });
       this.tracker.onRotate = () => { if (this.phase === 'menu') this.hud.banner('Camera turned', '#fff', 1.1, '', 'low'); };
       this.begin();
     } catch (e) {
@@ -529,7 +541,7 @@ class App {
   // are being missed; creep back up when there is room; and if dropping did not help (the body
   // tracking is the slow part, not the drawing), put the sharpness back and stop trying.
   pace(fps) {
-    if (this.fpsEl) this.fpsEl.textContent = `${fps.toFixed(0)} fps · sharpness ${this.pixelRatio.toFixed(2)} of ${this.prMax.toFixed(2)} · ${this.players.length} in view`;
+    if (this.fpsEl) this.fpsEl.textContent = `${fps.toFixed(0)} fps · sharpness ${this.pixelRatio.toFixed(2)} of ${this.prMax.toFixed(2)} · ${this.players.length} in view${this.tracker.follow ? ` · tracking ${this.tracker.follow.cost.toFixed(1)} ms a look` : this.tracker.mode === 'camera' ? ' · whole-picture tracking' : ''}`;
     if (qs.has('sim') || qs.has('pr') || this.lowFx || this.busy || document.hidden) { this.lastStep = null; this.goodN = 0; return; }
     const step = (to) => { this.lastStep = { from: this.pixelRatio, fps }; this.pixelRatio = to; this.goodN = 0; this.resize(); try { localStorage.setItem('ww-pr', to.toFixed(2)); } catch (e) { /* fine */ } };
     const last = this.lastStep; this.lastStep = null;

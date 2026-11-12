@@ -17,7 +17,7 @@ export const MARKUP = `
   <div id="howto"></div>
   <div id="results"></div>
 </div>
-<div id="pip"><button id="b-rot" type="button" aria-label="Rotate camera picture">Rotate ⟳</button></div>
+<div id="pip"><button id="b-cams" type="button" aria-label="Switch to the next camera" hidden>Camera ⇄</button><button id="b-rot" type="button" aria-label="Rotate camera picture">Rotate ⟳</button></div>
 <div id="pause"><div><b>Paused</b><span>Step back in front of the camera to carry on</span></div></div>
 <div id="wipe"></div>
 <div id="boot">
