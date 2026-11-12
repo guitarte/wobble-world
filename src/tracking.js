@@ -193,9 +193,9 @@ export class Tracker {
     this.stageW = 16; this.stageH = STAGE_H; this.lastVideoTime = -1; this.lastDetect = 0;
     this.onJoin = null; this.onLeave = null; this.mirror = true;
     this.canvas = document.createElement('canvas'); this.ctx = this.canvas.getContext('2d', { alpha: false });
-    this.rotation = 0; this.autoRotate = false; this.sideTurn = 0; this.sideSince = 0;
+    this.rotation = 0; this.autoRotate = false; this.sideTurn = 0; this.sideSince = 0; this.sideN = 0; this.sideSize = 0; this.sideSeen = 0; this.upSize = 0; this.upSeen = 0;
     this.fit = true; this.cands = []; this.maxSide = 720; this.frameN = 0;
-    this.follow = null; this.classic = false; this.patience = 900; // how long a player may be out of sight, in milliseconds
+    this.follow = null; this.classic = false; this.shared = false; this.patience = 900; // how long a player may be out of sight, in milliseconds
     try { this.rotation = (+localStorage.getItem('ww-rot') || 0) % 360; } catch (e) { /* fine */ }
   }
 
@@ -267,7 +267,7 @@ export class Tracker {
     // Each player gets a follower of their own (see follow.js). The older way, one model
     // looking at the whole picture for everybody, stays as a fallback.
     if (!this.classic) {
-      try { this.follow = new Follow(this, make); await this.follow.start(); this.patience = 1100; }
+      try { this.follow = new Follow(this, make, this.shared); await this.follow.start(); this.patience = 1100; }
       catch (e) { console.warn('following is not available, using whole-picture tracking', e); this.follow = null; }
     }
     if (!this.follow) this.landmarker = await make({
@@ -321,30 +321,42 @@ export class Tracker {
   }
   // Copy one piece of that upright picture (x, y, w, h in its own dots) so that it fills a
   // canvas of cw by ch. Anything beyond the edge of the picture comes out black.
-  paint(g, cw, ch, x, y, w, h) {
+  // (dx, dy) is where on the canvas the piece goes.
+  paint(g, cw, ch, x, y, w, h, dx = 0, dy = 0) {
     const c = this.canvas, x0 = Math.max(0, x), y0 = Math.max(0, y), x1 = Math.min(c.width, x + w), y1 = Math.min(c.height, y + h), kx = cw / w, ky = ch / h;
     g.setTransform(1, 0, 0, 1, 0, 0);
-    if (x0 > x || y0 > y || x1 < x + w || y1 < y + h) { g.fillStyle = '#000'; g.fillRect(0, 0, cw, ch); }
-    if (x1 > x0 && y1 > y0) g.drawImage(c, x0, y0, x1 - x0, y1 - y0, (x0 - x) * kx, (y0 - y) * ky, (x1 - x0) * kx, (y1 - y0) * ky);
+    if (x0 > x || y0 > y || x1 < x + w || y1 < y + h) { g.fillStyle = '#000'; g.fillRect(dx, dy, cw, ch); }
+    if (x1 > x0 && y1 > y0) g.drawImage(c, x0, y0, x1 - x0, y1 - y0, dx + (x0 - x) * kx, dy + (y0 - y) * ky, (x1 - x0) * kx, (y1 - y0) * ky);
   }
   setRotation(deg) {
-    this.rotation = ((deg % 360) + 360) % 360; this.sideT = 0;
+    this.rotation = ((deg % 360) + 360) % 360; this.sideN = 0; this.sideSize = 0; this.upSize = 0;
     try { localStorage.setItem('ww-rot', this.rotation); } catch (e) { /* fine */ }
     this.clear();
     this.onRotate?.(this.rotation);
   }
-  // If the clearest body in view has been lying sideways or upside down for a
+  // If the biggest clear body in view has been lying sideways or upside down for a
   // moment, the picture is turned: rotate it so that body stands upright.
   checkUpright(sets, frame, now) {
-    let turn = 0;
+    let up = 0, side = 0, turn = 0;
     for (const lm of sets) {
       if (!lm || ((lm[11].visibility ?? 1) + (lm[12].visibility ?? 1) + (lm[23].visibility ?? 1) + (lm[24].visibility ?? 1)) / 4 < 0.6) continue;
       const dx = ((lm[23].x + lm[24].x) - (lm[11].x + lm[12].x)) * frame.width, dy = ((lm[23].y + lm[24].y) - (lm[11].y + lm[12].y)) * frame.height;
-      if (Math.abs(dx) > 1.7 * Math.abs(dy)) turn = dx > 0 ? 90 : 270; else if (dy < 0 && Math.abs(dy) > 1.7 * Math.abs(dx)) turn = 180;
-      break;
+      const len = Math.hypot(dx, dy), ax = Math.abs(dx), ay = Math.abs(dy);
+      // somebody leaning over at an angle says nothing either way
+      if (ay > 1.4 * ax && dy > 0) up = Math.max(up, len);
+      else if (len > side && (ax > 1.4 * ay || ay > 1.4 * ax)) { side = len; turn = ax > ay ? (dx > 0 ? 90 : 270) : 180; }
     }
-    if (!turn || turn !== this.sideTurn) { this.sideTurn = turn; this.sideSince = now; return; }
-    if (now - this.sideSince > 1200) { this.sideTurn = 0; this.setRotation(this.rotation + turn); }
+    // Somebody standing upright settles it: the picture is the right way up. (A much smaller
+    // upright shape, a false alarm on a cluttered shelf, does not.)
+    let stood = now - this.upSeen < 1500 ? this.upSize : 0;
+    if (up >= 0.8 * stood) { this.upSize = stood = up; this.upSeen = now; }
+    if (up && up >= 0.6 * this.sideSize) this.sideN = 0;
+    // The scout only comes across a body every few frames, so gaps between sightings do not
+    // start the count again: only a long gap does, or a body seen another way up.
+    if (!side || side < 1.3 * stood) { if (now - this.sideSeen > 1500) this.sideN = 0; return; }
+    if (turn !== this.sideTurn || this.sideN <= 0) { this.sideTurn = turn; this.sideSince = now; this.sideN = 0; }
+    this.sideSeen = now; this.sideSize = side;
+    if (++this.sideN >= 4 && now - this.sideSince > 1200) { this.sideN = 0; this.setRotation(this.rotation + turn); }
   }
 
   // One detected body in stage units (mirrored), with what the fit needs to know about it.

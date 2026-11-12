@@ -34,7 +34,7 @@ const { chromium } = require('playwright');
     const extra = want ? counts.filter(c => c > want).length : 0;
     if (process.env.TIMELINE) for (let sl = 0; sl < 4; sl++) console.log(`   P${sl + 1} ` + r.log.map((row, f) => f % 2 ? '' : row[sl] ? Math.min(9, Math.max(0, Math.round(row[sl][0] * 10 + 5))) : '.').join(''));
     all += want * counts.length; got += counts.reduce((s, c) => s + Math.min(c, want), 0);
-    console.log(`${clip.padEnd(12)} people ${want}  seen ${(share * 100).toFixed(0).padStart(3)}%  all in after ${full < 0 ? ' never' : (full / 30).toFixed(1).padStart(5) + 's'}  then held ${(held * 100).toFixed(0).padStart(3)}%  too many ${extra}  joins ${r.events.filter(e => 'join' in e).length} leaves ${r.events.filter(e => 'leave' in e).length}  ${r.ms.toFixed(0)}ms/frame  players/frames ${JSON.stringify(hist)}`);
+    console.log(`${clip.padEnd(12)} people ${want}  seen ${(share * 100).toFixed(0).padStart(3)}%  all in after ${full < 0 ? ' never' : (full / 30).toFixed(1).padStart(5) + 's'}  then held ${(held * 100).toFixed(0).padStart(3)}%  too many ${extra}  joins ${r.events.filter(e => 'join' in e).length} leaves ${r.events.filter(e => 'leave' in e).length}  ${r.ms.toFixed(0)}ms/frame  players/frames ${JSON.stringify(hist)}${r.turned ? `  picture turned ${r.turned}` : ''}`);
   }
   console.log(`overall: ${(100 * got / Math.max(1, all)).toFixed(1)}% of people on screen were in play`);
   await b.close();

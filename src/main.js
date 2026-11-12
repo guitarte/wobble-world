@@ -117,10 +117,23 @@ class App {
     try {
       msg.textContent = 'Asking for the camera…';
       let saved = null; try { saved = localStorage.getItem('ww-cam'); } catch (e) { /* fine */ }
-      // Phones and tablets keep the whole-picture tracking for now: a follower for every
-      // player takes a few hundred megabytes, which has not been tried on them yet.
+      // A computer gives every player a pose model of their own. Phones and tablets have
+      // less memory to spare, so there one model follows everybody (see follow.js).
       const handheld = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
-      this.tracker.classic = qs.has('track') ? qs.get('track') === 'classic' : handheld;
+      const ways = ['follow', 'shared', 'classic']; // heaviest first; ?track= picks one by hand
+      let way = ways.includes(qs.get('track')) ? qs.get('track') : null;
+      const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { /* fine */ } return null; };
+      if (!way) {
+        way = ways.includes(store('ww-track')) ? store('ww-track') : handheld ? 'shared' : 'follow';
+        // The last visit started loading this tracking and never got as far as the menu: most
+        // likely the browser ran out of memory and threw the page away. Take the next lighter
+        // way from now on, so that nobody gets stuck on a page that keeps crashing.
+        if (store('ww-track-try') === way && way !== 'classic') { way = ways[ways.indexOf(way) + 1]; store('ww-track', way); }
+        store('ww-track-try', way);
+        const made = () => store('ww-track-try', null);
+        this.trackMade = () => setTimeout(made, 6000); addEventListener('pagehide', made);
+      }
+      this.tracker.classic = way === 'classic'; this.tracker.shared = way === 'shared';
       await this.tracker.startCamera(qs.get('cam') === 'back' ? 'environment' : 'user', qs.has('cam') ? null : saved);
       msg.textContent = 'Loading body tracking…';
       await this.tracker.loadModel(new URL('.', document.baseURI).href, qs.has('cpu') ? 'CPU' : undefined);
@@ -135,9 +148,10 @@ class App {
         if (name) { this.pipAr = 0; this.hud.banner(name, '#fff', 1.6, 'Camera switched', 'low'); }
       });
       this.tracker.onRotate = () => { if (this.phase === 'menu') this.hud.banner('Camera turned', '#fff', 1.1, '', 'low'); };
+      this.trackMade?.();
       this.begin();
     } catch (e) {
-      console.warn(e); btn.disabled = false;
+      console.warn(e); btn.disabled = false; try { localStorage.removeItem('ww-track-try'); } catch (err) { /* fine */ }
       const blocked = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError' || e.message === 'no-camera-api');
       const embedded = window.self !== window.top;
       if (blocked && embedded) msg.innerHTML = `This preview can't use a camera. Play with your body at <a href="${SITE}" target="_blank" rel="noopener">${SITE.replace('https://', '')}</a>, or try the mouse and touch mode here.`;
@@ -541,7 +555,7 @@ class App {
   // are being missed; creep back up when there is room; and if dropping did not help (the body
   // tracking is the slow part, not the drawing), put the sharpness back and stop trying.
   pace(fps) {
-    if (this.fpsEl) this.fpsEl.textContent = `${fps.toFixed(0)} fps · sharpness ${this.pixelRatio.toFixed(2)} of ${this.prMax.toFixed(2)} · ${this.players.length} in view${this.tracker.follow ? ` · tracking ${this.tracker.follow.cost.toFixed(1)} ms a look` : this.tracker.mode === 'camera' ? ' · whole-picture tracking' : ''}`;
+    if (this.fpsEl) this.fpsEl.textContent = `${fps.toFixed(0)} fps · sharpness ${this.pixelRatio.toFixed(2)} of ${this.prMax.toFixed(2)} · ${this.players.length} in view${this.tracker.follow ? ` · tracking ${this.tracker.follow.cost.toFixed(1)} ms a look${this.tracker.follow.shared ? ', one model for all' : ''}` : this.tracker.mode === 'camera' ? ' · whole-picture tracking' : ''}`;
     if (qs.has('sim') || qs.has('pr') || this.lowFx || this.busy || document.hidden) { this.lastStep = null; this.goodN = 0; return; }
     const step = (to) => { this.lastStep = { from: this.pixelRatio, fps }; this.pixelRatio = to; this.goodN = 0; this.resize(); try { localStorage.setItem('ww-pr', to.toFixed(2)); } catch (e) { /* fine */ } };
     const last = this.lastStep; this.lastStep = null;

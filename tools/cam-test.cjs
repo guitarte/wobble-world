@@ -16,7 +16,7 @@ const { chromium } = require('playwright');
   const t0 = Date.now(); let last = '';
   while (Date.now() - t0 < +secs * 1000) {
     await p.waitForTimeout(1000);
-    const s = await p.evaluate(() => { const a = window.__ww, tr = a.tracker, f = tr.follow; return JSON.stringify({ phase: a.phase, mode: tr.mode, engine: f ? 'follow' : 'classic', players: tr.players.map(q => q ? q.slot + 1 : 0).join(''), tracks: f?.tracks.length, cost: f && +f.cost.toFixed(0), msg: document.getElementById('boot-msg')?.textContent.slice(0, 60) }); });
+    const s = await p.evaluate(() => { const a = window.__ww, tr = a.tracker, f = tr.follow; return JSON.stringify({ phase: a.phase, mode: tr.mode, engine: f ? (f.shared ? 'shared' : 'follow') : 'classic', players: tr.players.map(q => q ? q.slot + 1 : 0).join(''), tracks: f?.tracks.length, cost: f && +f.cost.toFixed(0), msg: document.getElementById('boot-msg')?.textContent.slice(0, 60) }); });
     if (s !== last) console.log(((Date.now() - t0) / 1000).toFixed(0).padStart(3) + 's', last = s);
   }
   require('fs').mkdirSync('shots', { recursive: true }); await p.screenshot({ path: 'shots/cam-test.png' });
