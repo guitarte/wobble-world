@@ -1,6 +1,7 @@
 // Body tracking: camera + MediaPipe pose -> up to 4 persistent players with
 // smoothed joints in "stage" coordinates (x: -8..8, y: -4.5..4.5, mirrored).
 import * as THREE from 'three';
+import { Follow } from './follow.js';
 
 export const STAGE_H = 9;
 export const MAX_PLAYERS = 4;
@@ -49,9 +50,9 @@ function fitFor(T, rel, zoom) {
   // someone sitting right in front of a laptop can still reach the whole screen.
   return { s: k > 0 ? (tgt + (T - tgt) * k) / T : Math.min(1.7, tgt / T), k };
 }
-const area = (b) => Math.max(0, b.x1 - b.x0) * Math.max(0, b.y1 - b.y0);
+export const area = (b) => Math.max(0, b.x1 - b.x0) * Math.max(0, b.y1 - b.y0);
 // Is box a sitting on top of box b: nearly the same space, or swallowing most of it?
-function crowds(a, b) {
+export function crowds(a, b) {
   if (!b) return false;
   const i = Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0));
   return i > 0.6 * area(b) || i > 0.4 * (area(a) + area(b) - i);
@@ -194,6 +195,7 @@ export class Tracker {
     this.canvas = document.createElement('canvas'); this.ctx = this.canvas.getContext('2d', { alpha: false });
     this.rotation = 0; this.autoRotate = false; this.sideTurn = 0; this.sideSince = 0;
     this.fit = true; this.cands = []; this.maxSide = 720; this.frameN = 0;
+    this.follow = null; this.classic = false; this.patience = 900; // how long a player may be out of sight, in milliseconds
     try { this.rotation = (+localStorage.getItem('ww-rot') || 0) % 360; } catch (e) { /* fine */ }
   }
 
@@ -220,31 +222,58 @@ export class Tracker {
     return close ? 'Step back a little so I can see all of you' : far ? 'Come a bit closer' : '';
   }
 
-  async startCamera(facing = 'user') {
+  // deviceId picks one particular camera, for machines with more than one plugged in.
+  async startCamera(facing = 'user', deviceId = null) {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('no-camera-api');
     if (this.stream) this.stream.getTracks().forEach(t => t.stop());
-    this.stream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
-    });
+    const open = (which) => navigator.mediaDevices.getUserMedia({ audio: false, video: { ...which, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } });
+    if (deviceId) { try { this.stream = await open({ deviceId: { exact: deviceId } }); } catch (e) { this.stream = null; } } // unplugged since last time
+    if (!deviceId || !this.stream) this.stream = await open({ facingMode: facing });
     if (!this.video) {
       this.video = document.createElement('video');
       this.video.playsInline = true; this.video.muted = true; this.video.autoplay = true;
     }
     this.video.srcObject = this.stream;
     await this.video.play();
-    this.facing = facing;
+    this.facing = facing; this.deviceId = this.stream.getVideoTracks()[0]?.getSettings?.().deviceId ?? null;
+  }
+  async cameras() {
+    try { return (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput' && d.deviceId); } catch (e) { return []; }
+  }
+  // Switch to the next camera on this machine. Returns its name, or null if there is only one.
+  async nextCamera() {
+    const cams = await this.cameras(); if (cams.length < 2) return null;
+    const was = this.deviceId, next = cams[(cams.findIndex(c => c.deviceId === was) + 1) % cams.length];
+    try { await this.startCamera(this.facing, next.deviceId); } catch (e) { await this.startCamera(this.facing, was); return null; }
+    this.clear();
+    try { localStorage.setItem('ww-cam', this.deviceId); } catch (e) { /* fine */ }
+    return (cams.find(c => c.deviceId === this.deviceId)?.label || 'Camera').replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/i, '');
+  }
+  // Everybody off the stage: the picture has changed under them.
+  clear() {
+    for (let i = 0; i < MAX_PLAYERS; i++) if (this.players[i]) { const p = this.players[i]; this.players[i] = null; this.onLeave?.(p); }
+    this.cands = []; this.follow?.reset(this.lastDetect);
   }
 
-  async loadModel(base) {
+  async loadModel(base, only) {
     const { FilesetResolver, PoseLandmarker } = await import('@mediapipe/tasks-vision');
     const fileset = await FilesetResolver.forVisionTasks(base + 'mp');
-    const make = (delegate) => PoseLandmarker.createFromOptions(fileset, {
-      baseOptions: { modelAssetPath: base + 'models/pose_landmarker_lite.task', delegate },
+    const model = new Uint8Array(await (await fetch(base + 'models/pose_landmarker_lite.task')).arrayBuffer());
+    let delegate = only ?? 'GPU';
+    const make = async (options) => {
+      const go = () => PoseLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetBuffer: model, delegate }, ...options });
+      try { return await go(); } catch (e) { if (delegate === 'CPU') throw e; delegate = 'CPU'; return go(); }
+    };
+    // Each player gets a follower of their own (see follow.js). The older way, one model
+    // looking at the whole picture for everybody, stays as a fallback.
+    if (!this.classic) {
+      try { this.follow = new Follow(this, make); await this.follow.start(); this.patience = 1100; }
+      catch (e) { console.warn('following is not available, using whole-picture tracking', e); this.follow = null; }
+    }
+    if (!this.follow) this.landmarker = await make({
       runningMode: 'VIDEO', numPoses: MAX_PLAYERS,
       minPoseDetectionConfidence: 0.5, minPosePresenceConfidence: 0.5, minTrackingConfidence: 0.5,
     });
-    try { this.landmarker = await make('GPU'); } catch (e) { this.landmarker = await make('CPU'); }
     this.mode = 'camera';
   }
 
@@ -258,13 +287,19 @@ export class Tracker {
       // A tall, narrow picture shows the whole body in the middle of the stage instead.
       if (aspect >= 1) { this.stageW = Math.max(16, STAGE_H * aspect); this.stageH = this.stageW / aspect; }
       else { this.stageH = STAGE_H; this.stageW = STAGE_H * aspect; }
-      let res = null;
-      try { res = this.landmarker.detectForVideo(frame, now); } catch (e) { /* skip frame */ }
-      if (res) { if (this.autoRotate) this.checkUpright(res.landmarks, frame, now); this.ingest(res.landmarks, now); }
+      if (this.follow) {
+        const sets = []; this.follow.step(now, sets);
+        if (this.autoRotate) this.checkUpright(sets, frame, now);
+      } else {
+        let res = null;
+        try { res = this.landmarker.detectForVideo(frame, now); } catch (e) { /* skip frame */ }
+        if (res) { if (this.autoRotate) this.checkUpright(res.landmarks, frame, now); this.ingest(res.landmarks, now); }
+      }
     }
     for (let i = 0; i < MAX_PLAYERS; i++) {
       const p = this.players[i]; if (!p) continue;
-      if (now - p.lastSeen > 900) { this.players[i] = null; this.onLeave?.(p); continue; }
+      // someone hidden behind another player is waited for a little longer than someone who walked off
+      if (now - p.lastSeen > (p.hidden ? 2.5 * this.patience : this.patience)) { this.players[i] = null; this.onLeave?.(p); continue; }
       const k = p.first ? 1 : 1 - Math.exp(-dt * 28);
       for (let n = 0; n < 33; n++) {
         const c = p.rig.pts[n], t = p.target[n];
@@ -278,16 +313,24 @@ export class Tracker {
   // Copy the camera frame to a canvas, turned so people stand upright. Some
   // phones and stands deliver the picture sideways.
   drawFrame() {
-    const v = this.video, vw = v.videoWidth, vh = v.videoHeight, k = Math.min(1, this.maxSide / Math.max(vw, vh));
+    const v = this.video, vw = v.videoWidth, vh = v.videoHeight, k = Math.min(1, (this.follow ? 1280 : this.maxSide) / Math.max(vw, vh));
     const side = this.rotation % 180 !== 0, cw = Math.round((side ? vh : vw) * k), ch = Math.round((side ? vw : vh) * k);
     const c = this.canvas; if (c.width !== cw || c.height !== ch) { c.width = cw; c.height = ch; }
-    const g = this.ctx; g.setTransform(1, 0, 0, 1, 0, 0); g.translate(cw / 2, ch / 2); g.rotate(this.rotation * Math.PI / 180); g.drawImage(v, -vw * k / 2, -vh * k / 2, vw * k, vh * k);
+    const g = this.ctx; g.setTransform(1, 0, 0, 1, 0, 0); g.translate(cw / 2, ch / 2); g.rotate(this.rotation * Math.PI / 180); g.drawImage(v.el ?? v, -vw * k / 2, -vh * k / 2, vw * k, vh * k);
     return c;
+  }
+  // Copy one piece of that upright picture (x, y, w, h in its own dots) so that it fills a
+  // canvas of cw by ch. Anything beyond the edge of the picture comes out black.
+  paint(g, cw, ch, x, y, w, h) {
+    const c = this.canvas, x0 = Math.max(0, x), y0 = Math.max(0, y), x1 = Math.min(c.width, x + w), y1 = Math.min(c.height, y + h), kx = cw / w, ky = ch / h;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    if (x0 > x || y0 > y || x1 < x + w || y1 < y + h) { g.fillStyle = '#000'; g.fillRect(0, 0, cw, ch); }
+    if (x1 > x0 && y1 > y0) g.drawImage(c, x0, y0, x1 - x0, y1 - y0, (x0 - x) * kx, (y0 - y) * ky, (x1 - x0) * kx, (y1 - y0) * ky);
   }
   setRotation(deg) {
     this.rotation = ((deg % 360) + 360) % 360; this.sideT = 0;
     try { localStorage.setItem('ww-rot', this.rotation); } catch (e) { /* fine */ }
-    for (let i = 0; i < MAX_PLAYERS; i++) if (this.players[i]) { const p = this.players[i]; this.players[i] = null; this.onLeave?.(p); }
+    this.clear();
     this.onRotate?.(this.rotation);
   }
   // If the clearest body in view has been lying sideways or upside down for a
@@ -322,7 +365,7 @@ export class Tracker {
     let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
     for (const n of [0, 11, 12, 23, 24, 25, 26, 27, 28]) { const q = pts[n]; if (n > 12 && q.v < 0.3) continue; x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y); }
     return {
-      pts, T, hipY, shx, hipOff: hips ? ((hl.x + hr.x) / 2 - shx) / 2 : 0, feetY: feet ? Math.min(pts[27].y, pts[28].y) : null,
+      pts, T, hipY, shx, shy, hipOff: hips ? ((hl.x + hr.x) / 2 - shx) / 2 : 0, feetY: feet ? Math.min(pts[27].y, pts[28].y) : null,
       box: { x0: x0 - 0.25 * T, x1: x1 + 0.25 * T, y0, y1: y1 + 0.4 * T },
       cx: (a.x + b.x + hl.x + hr.x) / 4, cy: (a.y + b.y + hl.y + hr.y) / 4, used: false,
     };
@@ -361,10 +404,15 @@ export class Tracker {
       c.cx = d.cx; c.cy = d.cy; c.n++; c.hit = true; c.miss = 0;
       if (c.n < 3 || now - c.since < 300) continue;
       const slot = this.players.findIndex(p => !p); if (slot < 0) continue;
-      const p = new Player(slot); p.born = now; this.players[slot] = p; c.done = true;
-      this.feed(p, d, now, dt); this.onJoin?.(p);
+      this.admit(slot, d, now, dt); c.done = true;
     }
     this.cands = this.cands.filter(c => !c.done && (c.hit || ++c.miss < 2));
+  }
+
+  // Somebody new takes a place on the stage.
+  admit(slot, d, now, dt) {
+    const p = new Player(slot); p.born = now; this.players[slot] = p;
+    this.feed(p, d, now, dt); this.onJoin?.(p); return p;
   }
 
   feed(p, d, now, dt) {

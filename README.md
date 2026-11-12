@@ -72,6 +72,9 @@ Arms always count towards the score. A knee lift, a lean or a knee bounce counts
 - **Computer:** open the link in Chrome, Edge or Safari on a laptop with a webcam, and stand back until your whole body is in view.
 - **iPhone or iPad:** open the link in Safari, turn the device sideways, prop it up facing the room, and use Screen Mirroring (AirPlay) to show it on the TV. Add `?cam=back` to the link to use the rear camera.
 - Stand about 2 to 3 metres from the camera. Good, even lighting helps tracking a lot.
+- Up to four people can play at once. Walk into view and stand clear of the others for a moment, and you get a hero within about half a second. If you step out and come back to the same spot within a few seconds, you get your own hero and score back.
+- More than one camera on the computer? A Camera button on the camera preview on the menu switches to the next one, and the choice is remembered. A wide webcam fits more players in than a laptop's built-in camera.
+- Camera extras that move or change the picture by themselves, such as Center Stage and Portrait mode on a Mac (in the green camera menu in the menu bar), are best turned off while playing.
 - Wherever you stand, you are fitted to hero size and stood on the stage floor, so a small child at the back of the room has the same reach as a grown-up at the front, and a camera that is tilted or cuts off your feet still works. If someone is too close for the camera to see all of them, a tip on the menu asks them to step back.
 - Menus are body-controlled: point a hand at a button along the top of the screen and hold it there until the edge fills. Your hand works like a pointer, so you can reach every button from one spot. Choose with one hand: two arms in the air are read as a cheer, not a choice. The home button in the top left corner leaves a game.
 - If the picture from the camera is sideways, it turns itself upright once it sees someone standing on the menu. The Rotate button on the camera preview does it by hand.
@@ -86,10 +89,23 @@ npm run dev      # local dev server
 npm run build    # production build in dist/
 ```
 
-Handy URL options: `?sim=2` starts with two pretend players (no camera), `?game=<id>` jumps straight into a game (`jelly`, `walls`, `comet`, `chop`, `pow`, `balloon`, `wing`, `laser`, `trot`, `bowl`, `lesson`, `battle`, `freeze`, `dot`, `topple`), `?ar=1` plays it in mirror mode, `?page=2` opens the menu on a given page, `?genre=pop|kpop|hiphop` picks the dance music, `?lesson=2` picks the dance lesson, `?fx=low` turns off the glow and comic print passes, `?rot=90` forces the camera rotation, `?fps` shows the frame rate and the current sharpness at the bottom of the screen, `?pr=1` fixes the sharpness.
+Handy URL options: `?sim=2` starts with two pretend players (no camera), `?game=<id>` jumps straight into a game (`jelly`, `walls`, `comet`, `chop`, `pow`, `balloon`, `wing`, `laser`, `trot`, `bowl`, `lesson`, `battle`, `freeze`, `dot`, `topple`), `?ar=1` plays it in mirror mode, `?page=2` opens the menu on a given page, `?genre=pop|kpop|hiphop` picks the dance music, `?lesson=2` picks the dance lesson, `?fx=low` turns off the glow and comic print passes, `?rot=90` forces the camera rotation, `?fps` shows the frame rate, the current sharpness and what body tracking costs at the bottom of the screen, `?pr=1` fixes the sharpness, `?track=classic` or `?track=follow` picks the body tracking (see below), `?cpu` runs body tracking without the graphics card.
 
 Built with Three.js for rendering, MediaPipe Pose Landmarker for body tracking (the model and runtime are bundled in `public/`), and the Web Audio API for all music and sound, which is synthesized live.
 
 Testing without a camera: with the preview server running (`npm run build && npx vite preview --port 4173 --strictPort`), `node tools/play.cjs <game>` fast-forwards a whole game with pretend players and prints scores and errors, `node tools/until.cjs` fast-forwards to a chosen moment and takes a picture, and `node tools/listen.cjs` starts the sound and reports loudness, stereo spread and peaks.
+
+### How several players are tracked
+
+The pose model works in two halves: it first has to notice a person in a small square copy of the picture, and from then on it follows them. Noticing is the weak half. With a few people standing back from a wide webcam, each of them is only a few dozen dots tall in that small copy, and of a group standing together the model tends to report only the clearest person. So `src/follow.js` splits the halves up:
+
+- Every player has a follower of their own: a pose model that only ever looks at a close-up cut around that one player, taken from the camera picture at full sharpness. Followers cannot mix players up, and a small child at the back of the room is seen as sharply as a grown-up at the front.
+- A scout looks for newcomers. It goes over the picture piece by piece, zoomed in, with the players it already knows painted out, so each look turns up the next person nobody is following yet. A newcomer has to be followed for a moment before joining, which keeps coats and shelf clutter from becoming players.
+- A player who drops out of sight keeps their place for about a second, and their hero and score stay reserved for them at that spot for a few seconds more.
+- On a slow machine the followers take turns, so tracking costs a fixed slice of each frame and the game itself never stalls.
+
+The older way (one model looking at the whole picture for everybody, `Tracker.ingest` in `src/tracking.js`) is still there. The pretend players use it, and so do phones and tablets for now: five pose models take about 400 MB more memory than one, which is fine on a computer and has not been tried on a phone yet. `?track=follow` turns the new tracking on anywhere and `?track=classic` turns it off. If the followers cannot be made, the game falls back to the older way by itself.
+
+Testing the tracking on recorded footage: with the dev server running (`npx vite --port 5173 --strictPort`), `node tools/track-test.cjs <folder of clips>` runs the real tracker over folders of numbered JPEG frames, one frame per pretend 1/30 s, and reports for each clip how quickly everyone joins, how well they are held, and how often there are too many players (add `LAB='?classic=1'` to measure the older tracking, `LAB='?gpu=0'` to run without a graphics card, `TIMELINE=1` for who was where). `node tools/cam-test.cjs <clip.y4m>` starts the whole game with a recording standing in for the camera.
 
 Pushing to `main` builds and publishes the site with GitHub Pages.
